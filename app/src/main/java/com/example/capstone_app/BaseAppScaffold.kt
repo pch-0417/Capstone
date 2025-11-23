@@ -35,8 +35,6 @@ import androidx.compose.ui.layout.ModifierLocalBeyondBoundsLayout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.capstone_app.ui.theme.Capstone_AppTheme
-
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BaseAppScaffold(
