@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "929843438254",
+    "project_id": "capstone-10d47",
+    "storage_bucket": "capstone-10d47.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:929843438254:android:b4da7720f2a63a2936c33f",
+        "android_client_info": {
+          "package_name": "com.example.livemonitor"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBpHmCnsoN93i1wZm-O9rrVsYJDyo5HX94"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
