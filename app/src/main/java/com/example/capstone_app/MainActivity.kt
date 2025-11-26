@@ -20,6 +20,7 @@ import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,6 +33,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.settingsapp.SettingsActivity
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Color
+import kotlinx.coroutines.launch
 
 
 // --- 컬러 팔레트 정의 (CSS 기반) ---
@@ -40,7 +44,7 @@ val CardBgColor = Color(0xFFFFFFFF)
 val TextPrimary = Color(0xFF1C1C1E)
 val TextSecondary = Color(0xFF8A8A8E)
 val BorderColor = Color(0xFFE5E5EA)
-
+val BrandPrimary = Color(0xFF13B6EC)
 // 센서별 색상
 val TempColor = Color(0xFFFFA500) // Orange
 val IllumColor = Color(0xFFFFD60A) // Yellow
@@ -69,40 +73,132 @@ data class SensorData(
 
 @Composable
 fun LiveMonitorApp() {
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
     MaterialTheme {
-        Scaffold(
-            bottomBar = { MonitorBottomBar() },
-            containerColor = BgColor
-        ) { paddingValues ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-            ) {
-                // 1. 상단 카메라 영역 (헤더 포함)
-                CameraHeaderSection()
-
-                // 2. 시간 표시
-                Text(
-                    text = "10:30:55",
-                    fontSize = 40.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary,
+        ModalNavigationDrawer(
+            drawerState = drawerState,
+            drawerContent = {
+                MenuDrawerContent()
+            }
+        ){
+            Scaffold(
+                bottomBar = { MonitorBottomBar() },
+                containerColor = BgColor
+            ) { paddingValues ->
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 24.dp, bottom = 12.dp),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        .fillMaxSize()
+                        .padding(paddingValues)
+                ) {// 1. 상단 카메라 영역 (헤더 포함)
+                    CameraHeaderSection(
+                        onMenuClick = {
+                        scope.launch { drawerState.open() }
+                    }
                 )
 
+                // 2. 시간 표시
+                    Text(
+                        text = "10:30:55",
+                        fontSize = 40.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 24.dp, bottom = 12.dp),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+
                 // 3. 센서 그리드
-                SensorGridSection()
+                    SensorGridSection()
+                }
             }
         }
     }
 }
-
 @Composable
-fun CameraHeaderSection() {
+fun MenuDrawerContent() {
+    ModalDrawerSheet(
+        drawerContainerColor = CardBgColor,
+        modifier = Modifier.width(300.dp) // 너비 제한
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp)
+        ) {
+            // 1. 프로필 영역
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(vertical = 24.dp)
+            ) {
+                // 프로필 이미지 대용 아이콘
+                Surface(
+                    shape = CircleShape,
+                    color = Color.LightGray,
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.padding(8.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(16.dp))
+                Text(
+                    text = "Jane Doe",
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 2. 메뉴 아이템 리스트
+
+            // Edit Profile (Selected Style)
+            NavigationDrawerItem(
+                label = { Text("Edit Profile", fontWeight = FontWeight.Bold) },
+                icon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                selected = true,
+                onClick = { /* 프로필 수정 이동 */ },
+                colors = NavigationDrawerItemDefaults.colors(
+                    selectedContainerColor = BrandPrimary.copy(alpha = 0.1f),
+                    selectedIconColor = BrandPrimary,
+                    selectedTextColor = BrandPrimary
+                ),
+                modifier = Modifier.padding(vertical = 4.dp)
+            )
+
+            // Logout (Default Style)
+            NavigationDrawerItem(
+                label = { Text("Logout", fontWeight = FontWeight.Bold) },
+                icon = { Icon(Icons.Default.Logout, contentDescription = null) },
+                selected = false,
+                onClick = { /* 로그아웃 로직 */ },
+                colors = NavigationDrawerItemDefaults.colors(
+                    unselectedIconColor = TextPrimary,
+                    unselectedTextColor = TextPrimary
+                ),
+                modifier = Modifier.padding(vertical = 4.dp)
+            )
+
+            Spacer(modifier = Modifier.weight(1f)) // 남은 공간 차지
+
+            // 3. 하단 버전 정보
+            Text(
+                text = "App Version: 1.2.3",
+                color = TextSecondary,
+                fontSize = 14.sp,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+        }
+    }
+}
+@Composable
+fun CameraHeaderSection(onMenuClick : () -> Unit) {
     val context = LocalContext.current
 
     Box(
@@ -133,7 +229,7 @@ fun CameraHeaderSection() {
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             IconButton(
-                onClick = {},
+                onClick = onMenuClick,
                 modifier = Modifier
                     .size(40.dp)
                     .background(Color.Black.copy(alpha = 0.4f), CircleShape)
