@@ -1,6 +1,7 @@
 package com.example.livemonitor
 
 import android.os.Bundle
+import android.content.Intent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.BorderStroke
@@ -25,10 +26,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.tooling.preview.Preview
+import com.example.settingsapp.SettingsActivity
+
 
 // --- 컬러 팔레트 정의 (CSS 기반) ---
 val BgColor = Color(0xFFF7F8FC)
@@ -99,6 +103,8 @@ fun LiveMonitorApp() {
 
 @Composable
 fun CameraHeaderSection() {
+    val context = LocalContext.current
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -143,7 +149,10 @@ fun CameraHeaderSection() {
             )
 
             IconButton(
-                onClick = {},
+                onClick = {
+                    val intent = Intent(context, SettingsActivity::class.java)
+                    context.startActivity(intent)
+                },
                 modifier = Modifier
                     .size(40.dp)
                     .background(Color.Black.copy(alpha = 0.4f), CircleShape)
