@@ -12,7 +12,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Capstone_App">
         <activity
-            android:name="com.example.livemonitor.MainActivity"
+            android:name="com.example.capstone_app.MainActivity"
             android:exported="true"
             android:label="@string/app_name"
             android:theme="@style/Theme.Capstone_App">

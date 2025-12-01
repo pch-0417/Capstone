@@ -1,56 +1,66 @@
-package com.example.livemonitor
+package com.example.capstone_app // ⭐ 본인 패키지명으로 꼭 수정하세요!
 
-import android.os.Bundle
 import android.content.Intent
+import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.Dashboard
-import androidx.compose.material.icons.outlined.History
-import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.*
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.tooling.preview.Preview
 import com.example.settingsapp.SettingsActivity
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.Color
-import hilt_aggregated_deps._dagger_hilt_android_internal_managers_ServiceComponentManager_ServiceComponentBuilderEntryPoint
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import kotlinx.coroutines.delay
+import java.util.TimeZone
+import androidx.compose.foundation.Canvas
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.Path
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
-import java.util.TimeZone
-
-
-// --- 컬러 팔레트 정의 (CSS 기반) ---
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.*
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
+val ColorPrimary = Color(0xFF13b6ec)      // Cyan (Primary)
+val ColorBackground = Color(0xFFf6f8f8)   // Light Background
+val ColorTextMain = Color(0xFF18181b)     // Zinc 900
+val ColorTextSub = Color(0xFF71717a)      // Zinc 500
+val ColorBorder = Color(0xFFe4e4e7)       // Zinc 200
+val ChartCyan = Color(0xFF25c6da)
+val ChartOrange = Color(0xFFf97316)
+val ChartBlue = Color(0xFF3b82f6)
+val ChartPurple = Color(0xFFa855f7)
 val BgColor = Color(0xFFF7F8FC)
 val CardBgColor = Color(0xFFFFFFFF)
 val TextPrimary = Color(0xFF1C1C1E)
@@ -62,7 +72,6 @@ val TempColor = Color(0xFFFFA500) // Orange
 val IllumColor = Color(0xFFFFD60A) // Yellow
 val WaterColor = Color(0xFF34C759) // Green
 val PhColor = Color(0xFFFF3B30)    // Red
-
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -71,8 +80,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-
-// --- 데이터 모델 ---
 data class SensorData(
     val title: String,
     val value: String,
@@ -82,32 +89,95 @@ data class SensorData(
     val icon: ImageVector,
     val isAlert: Boolean = false
 )
-
+// --- 1. 메인 화면 (화면 관리자) ---
 @Composable
 fun LiveMonitorApp() {
+    // 현재 선택된 화면을 기억하는 변수 ("Dashboard"가 기본값)
+    var currentScreen by remember { mutableStateOf("Dashboard") }
+
+    Scaffold(
+        // 하단 네비게이션 바 설정
+        bottomBar = {
+            NavigationBar(containerColor = Color.White) {
+                // 1️⃣ Dashboard 버튼
+                NavigationBarItem(
+                    selected = currentScreen == "Dashboard",
+                    onClick = { currentScreen = "Dashboard" }, // 클릭 시 화면 변경
+                    icon = { Icon(Icons.Default.Dashboard, contentDescription = null) },
+                    label = { Text("Dashboard") },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = Color(0xFF007AFF), // 선택되면 파란색
+                        selectedTextColor = Color(0xFF007AFF),
+                        indicatorColor = Color(0xFF007AFF).copy(alpha = 0.1f), // 배경 연한 파랑
+                        unselectedIconColor = Color.Gray,
+                        unselectedTextColor = Color.Gray
+                    )
+                )
+                // 2️⃣ History 버튼
+                NavigationBarItem(
+                    selected = currentScreen == "History",
+                    onClick = { currentScreen = "History" },
+                    icon = { Icon(Icons.Default.History, contentDescription = null) },
+                    label = { Text("History") },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = Color(0xFF007AFF),
+                        selectedTextColor = Color(0xFF007AFF),
+                        indicatorColor = Color(0xFF007AFF).copy(alpha = 0.1f),
+                        unselectedIconColor = Color.Gray,
+                        unselectedTextColor = Color.Gray
+                    )
+                )
+                // 3️⃣ Alerts 버튼
+                NavigationBarItem(
+                    selected = currentScreen == "Alerts",
+                    onClick = { currentScreen = "Alerts" },
+                    icon = { Icon(Icons.Default.Notifications, contentDescription = null) },
+                    label = { Text("Alerts") },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = Color(0xFF007AFF),
+                        selectedTextColor = Color(0xFF007AFF),
+                        indicatorColor = Color(0xFF007AFF).copy(alpha = 0.1f),
+                        unselectedIconColor = Color.Gray,
+                        unselectedTextColor = Color.Gray
+                    )
+                )
+            }
+        }
+    ) { paddingValues ->
+        // 내용이 들어갈 공간 (Box)
+        Box(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
+            when (currentScreen) {
+                "Dashboard" -> DashboardScreen() // 대시보드 보여주기
+                "History" -> HistoryScreen()     // 히스토리 보여주기
+                "Alerts" -> AlertsScreen()       // 알림 보여주기
+            }
+        }
+    }
+}
+
+// --- 2. 각 화면별 디자인 (Composable 함수) ---
+
+@Composable
+fun DashboardScreen() {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     var currentTime by remember { mutableStateOf("Loading...") }
-
-    LaunchedEffect(Unit){
-        while (true){
+    LaunchedEffect(Unit) {
+        while (true) {
             val formatter = SimpleDateFormat("HH:mm:ss", Locale.KOREA)
             formatter.timeZone = TimeZone.getTimeZone("Asia/Seoul")
             currentTime = formatter.format(Date())
             delay(1000L)
         }
     }
-
     val sensors = listOf(
         SensorData("Temperature", "22.5", "°C", "Normal", TempColor, Icons.Default.Thermostat),
         SensorData("Illuminance", "850", " lux", "Warning", IllumColor, Icons.Default.WbSunny, isAlert = true),
         SensorData("Water Level", "78", " cm", "Normal", WaterColor, Icons.Default.WaterDrop),
         SensorData("pH", "6.8", " pH", "Alert", PhColor, Icons.Default.Science, isAlert = true),
         // 스크롤 확인을 위해 더미 데이터 추가
-        SensorData("Humidity", "45", " %", "Normal", BrandPrimary, Icons.Default.WaterDrop),
-        SensorData("CO2", "400", " ppm", "Good", TextSecondary, Icons.Default.Cloud)
-    )
 
+    )
     MaterialTheme {
         ModalNavigationDrawer(
             drawerState = drawerState,
@@ -116,48 +186,48 @@ fun LiveMonitorApp() {
             }
         ){
             Scaffold(
-                bottomBar = { MonitorBottomBar() },
+                // bottomBar = { MonitorBottomBar() }, // <--- 바텀바 제거됨
                 containerColor = BgColor
             ) { paddingValues ->
-                 LazyVerticalGrid(
-                     columns = GridCells.Fixed(2),
-                     modifier = Modifier
-                         .fillMaxSize()
-                         .padding(paddingValues),
-                     contentPadding = PaddingValues(24.dp),
-                     horizontalArrangement = Arrangement.spacedBy(16.dp),
-                     verticalArrangement = Arrangement.spacedBy(16.dp)
-                 ) {
-                     item(span = { GridItemSpan(2) }) {
-                             CameraHeaderSection(
-                                 onMenuClick = {
-                                     scope.launch { drawerState.open() }
-                                 }
-                             )
-                        }
-                         item(span = { GridItemSpan(2) }) {
-                            Text(
-                                text = currentTime,
-                                fontSize = 40.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = TextPrimary,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding( bottom = 8.dp),
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(2),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues),
+                    contentPadding = PaddingValues(24.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    item(span = { GridItemSpan(2) }) {
+                        CameraHeaderSection(
+                            onMenuClick = {
+                                scope.launch { drawerState.open() }
+                            }
+                        )
+                    }
+                    item(span = { GridItemSpan(2) }) {
+                        Text(
+                            text = currentTime,
+                            fontSize = 40.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding( bottom = 8.dp),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
 
                             )
-                         }
-                         items(sensors) {sensor ->
-                             Box(modifier = Modifier.padding(horizontal = 8.dp)){
-                                 SensorCard(sensor)
-                             }
-                         }
-                     }
+                    }
+                    items(sensors) {sensor ->
+                        Box(modifier = Modifier.padding(horizontal = 8.dp)){
+                            SensorCard(sensor)
+                        }
+                    }
                 }
             }
         }
     }
+}
 @Composable
 fun MenuDrawerContent() {
     ModalDrawerSheet(
@@ -306,29 +376,6 @@ fun CameraHeaderSection(onMenuClick : () -> Unit) {
         }
     }
 }
-
-@Composable
-fun SensorGridSection() {
-    // 샘플 데이터 생성
-    val sensors = listOf(
-        SensorData("Temperature", "22.5", "°C", "Normal", TempColor, Icons.Default.Thermostat),
-        SensorData("Illuminance", "850", " lux", "Warning", IllumColor, Icons.Default.WbSunny, isAlert = true),
-        SensorData("Water Level", "78", " cm", "Normal", WaterColor, Icons.Default.WaterDrop),
-        SensorData("pH", "6.8", " pH", "Alert", PhColor, Icons.Default.Science, isAlert = true)
-    )
-
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(2),
-        contentPadding = PaddingValues(16.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        items(sensors) { sensor ->
-            SensorCard(sensor)
-        }
-    }
-}
-
 @Composable
 fun SensorCard(data: SensorData) {
     Card(
@@ -392,7 +439,6 @@ fun SensorCard(data: SensorData) {
         }
     }
 }
-
 @Composable
 fun WaveChart(color: Color) {
     Canvas(
@@ -454,49 +500,369 @@ fun WaveChart(color: Color) {
         )
     }
 }
+@Composable
+fun HistoryScreen() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(ColorBackground)
+            .verticalScroll(rememberScrollState())
+            .padding(bottom = 24.dp) // 하단 여백
+    ) {
+        Header()            // 상단 제목 & 공유 버튼
+        TimeFrameSelector() // Day/Week/Month/Year 선택기
+        StatisticsCard()    // 통계 차트 카드
+        CalendarCard()      // 달력 카드
+        FooterText()        // 하단 안내 문구
+        }
+}
 
 @Composable
-fun MonitorBottomBar() {
-    NavigationBar(
-        containerColor = BgColor.copy(alpha = 0.9f),
-        tonalElevation = 0.dp
+fun Header() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        NavigationBarItem(
-            icon = { Icon(Icons.Outlined.Dashboard, contentDescription = null) },
-            label = { Text("Dashboard") },
-            selected = true,
-            onClick = {},
-            colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = Color(0xFF007AFF),
-                selectedTextColor = Color(0xFF007AFF),
-                indicatorColor = Color.Transparent
-            )
+        // 왼쪽 빈 공간 (균형 맞추기용)
+        Box(modifier = Modifier.size(48.dp))
+
+        Text(
+            text = "Statistics",
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+            color = ColorTextMain
         )
-        NavigationBarItem(
-            icon = { Icon(Icons.Outlined.History, contentDescription = null) },
-            label = { Text("History") },
-            selected = false,
-            onClick = {},
-            colors = NavigationBarItemDefaults.colors(
-                unselectedIconColor = TextSecondary,
-                unselectedTextColor = TextSecondary
+
+        // 공유 버튼 (기본 아이콘 사용)
+        IconButton(
+            onClick = { },
+            modifier = Modifier.size(48.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Share,
+                contentDescription = "Share",
+                tint = ColorTextMain
             )
-        )
-        NavigationBarItem(
-            icon = { Icon(Icons.Outlined.Notifications, contentDescription = null) },
-            label = { Text("Alerts") },
-            selected = false,
-            onClick = {},
-            colors = NavigationBarItemDefaults.colors(
-                unselectedIconColor = TextSecondary,
-                unselectedTextColor = TextSecondary
+        }
+    }
+}
+@Composable
+fun TimeFrameSelector() {
+    val options = listOf("Day", "Week", "Month", "Year")
+    var selectedOption by remember { mutableStateOf("Week") }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .height(40.dp)
+            .background(Color(0xFFf4f4f5), RoundedCornerShape(8.dp)) // Zinc 100
+            .padding(4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        options.forEach { option ->
+            val isSelected = selectedOption == option
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(if (isSelected) Color.White else Color.Transparent)
+                    .clickable { selectedOption = option },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = option,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = if (isSelected) ColorPrimary else ColorTextSub
+                )
+            }
+        }
+    }
+}
+@Composable
+fun StatisticsCard() {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        border = BorderStroke(1.dp, ColorBorder)
+    ) {
+        Column(modifier = Modifier.padding(24.dp)) {
+            Text(
+                text = "Overall Statistics",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                color = ColorTextMain
             )
+            Row(
+                verticalAlignment = Alignment.Bottom,
+                modifier = Modifier.padding(bottom = 16.dp)
+            ) {
+                Text(
+                    text = "Weekly Summary",
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = ColorTextMain,
+                    modifier = Modifier.padding(end = 8.dp)
+                )
+                Text(
+                    text = "+3.8%",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFF22c55e) // Green 500
+                )
+            }
+
+            // 차트 영역 (Canvas로 직접 그리기)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(180.dp)
+            ) {
+                CustomLineChart()
+            }
+
+            // 요일 라벨
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun").forEach { day ->
+                    Text(
+                        text = day,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = ColorTextSub
+                    )
+                }
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), color = ColorBorder)
+
+            // 범례 (Legend)
+            Column {
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    LegendItem(color = ChartCyan, text = "CO2 Levels", modifier = Modifier.weight(1f))
+                    LegendItem(color = ChartOrange, text = "Temperature", modifier = Modifier.weight(1f))
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    LegendItem(color = ChartBlue, text = "Humidity", modifier = Modifier.weight(1f))
+                    LegendItem(color = ChartPurple, text = "PM2.5", modifier = Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+@Composable
+fun LegendItem(color: Color, text: String, modifier: Modifier = Modifier) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+    ) {
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .clip(CircleShape)
+                .background(color)
         )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = text,
+            fontSize = 14.sp,
+            color = Color(0xFF3f3f46) // Zinc 700
+        )
+    }
+}
+
+@Composable
+fun CustomLineChart() {
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        val width = size.width
+        val height = size.height
+
+        // 차트 1 (점선, Cyan)
+        val path1 = Path().apply {
+            moveTo(0f, height * 0.7f)
+            cubicTo(width * 0.1f, height * 0.1f, width * 0.4f, height * 0.1f, width * 0.5f, height * 0.2f)
+            cubicTo(width * 0.6f, height * 0.4f, width * 0.8f, height * 0.9f, width, height * 0.9f)
+        }
+        drawPath(
+            path = path1,
+            color = ChartCyan,
+            style = Stroke(width = 5f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f), cap = StrokeCap.Round)
+        )
+
+        // 차트 2 (실선, Orange)
+        val path2 = Path().apply {
+            moveTo(0f, height * 0.5f)
+            cubicTo(width * 0.2f, height * 0.4f, width * 0.5f, height * 0.6f, width * 0.7f, height * 0.7f)
+            cubicTo(width * 0.8f, height * 0.8f, width * 0.9f, height * 0.9f, width, height * 0.8f)
+        }
+        drawPath(path = path2, color = ChartOrange, style = Stroke(width = 5f, cap = StrokeCap.Round))
+
+        // 차트 3 (실선, Blue)
+        val path3 = Path().apply {
+            moveTo(0f, height * 0.3f)
+            cubicTo(width * 0.2f, height * 0.8f, width * 0.4f, height * 0.9f, width * 0.6f, height * 0.6f)
+            cubicTo(width * 0.8f, height * 0.3f, width * 0.9f, height * 0.2f, width, height * 0.3f)
+        }
+        drawPath(path = path3, color = ChartBlue, style = Stroke(width = 5f, cap = StrokeCap.Round))
+
+        // 차트 4 (실선, Purple)
+        val path4 = Path().apply {
+            moveTo(0f, height * 0.9f)
+            cubicTo(width * 0.2f, height * 0.4f, width * 0.5f, height * 0.5f, width * 0.7f, height * 0.2f)
+            cubicTo(width * 0.8f, height * 0.1f, width * 0.9f, height * 0.3f, width, height * 0.1f)
+        }
+        drawPath(path = path4, color = ChartPurple, style = Stroke(width = 5f, cap = StrokeCap.Round))
+    }
+}
+@Composable
+fun CalendarCard() {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        border = BorderStroke(1.dp, ColorBorder)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            // 달력 헤더
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                // 기본 아이콘 사용 (ChevronLeft)
+                IconButton(onClick = { }) {
+                    Icon(Icons.Default.ChevronLeft, contentDescription = "Prev", tint = ColorTextMain)
+                }
+                Text(
+                    text = "October 2023",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = ColorTextMain
+                )
+                // 기본 아이콘 사용 (ChevronRight)
+                IconButton(onClick = { }) {
+                    Icon(Icons.Default.ChevronRight, contentDescription = "Next", tint = ColorTextMain)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // 요일 (S M T W T F S)
+            Row(modifier = Modifier.fillMaxWidth()) {
+                listOf("S", "M", "T", "W", "T", "F", "S").forEach { day ->
+                    Text(
+                        text = day,
+                        modifier = Modifier.weight(1f),
+                        textAlign = TextAlign.Center,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = ColorTextSub
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // 날짜 그리드
+            val days = (1..31).toList()
+            val gridItems = days.chunked(7)
+
+            gridItems.forEach { week ->
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    week.forEach { day ->
+                        // HTML 스타일 로직 (특정 날짜 색상 변경)
+                        val bgColor = when (day) {
+                            5 -> ColorPrimary // 선택된 날짜 (파란색)
+                            7 -> Color(0xFF06b6d4) // Cyan 500
+                            else -> when (day) {
+                                1, 9 -> Color(0xFFecfeff)
+                                2, 8, 13 -> Color(0xFFcffafe)
+                                3, 11 -> Color(0xFFa5f3fc)
+                                4, 15 -> Color(0xFF67e8f9)
+                                6 -> Color(0xFF22d3ee)
+                                10 -> Color(0xFFffedd5) // Orange
+                                14 -> Color(0xFFe9d5ff) // Purple
+                                else -> Color.Transparent
+                            }
+                        }
+
+                        val textColor = if (day == 5 || day == 7) Color.White else if(day >= 16) Color(0xFFa1a1aa) else ColorTextMain
+
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(40.dp)
+                                .padding(2.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(CircleShape)
+                                    .background(bgColor),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = day.toString(),
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = textColor
+                                )
+                            }
+                        }
+                    }
+                    // 남은 칸 채우기
+                    repeat(7 - week.size) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+    }
+}
+@Composable
+fun FooterText() {
+    Text(
+        text = "Tap a day to see details",
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp),
+        textAlign = TextAlign.Center,
+        fontSize = 14.sp,
+        color = ColorTextSub
+    )
+}
+
+@Composable
+fun AlertsScreen() {
+    Box(
+        modifier = Modifier.fillMaxSize().background(Color.White),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(Icons.Default.Notifications, contentDescription = null, modifier = Modifier.size(64.dp), tint = Color.Gray)
+            Spacer(modifier = Modifier.height(16.dp))
+            Text("알림(Alerts) 화면입니다", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        }
     }
 }
 
 @Preview(showBackground = true)
 @Composable
-fun DefaultPreview() {
-    LiveMonitorApp()
+fun PreviewStatistics() {
+    HistoryScreen()
 }
