@@ -9,6 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import android.util.Log
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -31,6 +32,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.firebase.Firebase
+import com.google.firebase.firestore.firestore
+
 
 // --- 1. 색상 정의 (요청하신 디자인 컬러) ---
 val PrimaryColor = Color(0xFF13B6EC)
@@ -55,6 +59,8 @@ class SettingsActivity : ComponentActivity() {
 // --- 3. 설정 화면 UI (Composable) ---
 @Composable
 fun SettingsScreen(onBackClick: () -> Unit = {}) {
+    val db = Firebase.firestore
+    val configRef = db.collection("settings").document("config")
     // 다크모드 감지
     val isDark = isSystemInDarkTheme()
     val bgColor = if (isDark) BgDark else BgLight
@@ -64,6 +70,8 @@ fun SettingsScreen(onBackClick: () -> Unit = {}) {
     // 상태 변수 (데이터 수신 주기, 알림, 촬영 간격)
     var selectedRefreshRate by remember { mutableStateOf("Standard (1s)") }
     var areNotificationsEnabled by remember { mutableStateOf(true) }
+    var on by remember { mutableStateOf(true) }
+    var LED by remember { mutableStateOf(true) }
     var captureInterval by remember { mutableFloatStateOf(30f) }
 
     Scaffold(
@@ -159,40 +167,74 @@ fun SettingsScreen(onBackClick: () -> Unit = {}) {
                     )
                 )
             }
-
-            // === Section 2: Camera ===
-            SectionHeader(text = "카메라", textColor = textColor)
-
-            // 슬라이더 박스
-            Column(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .border(1.dp, borderColor, RoundedCornerShape(8.dp))
-                    .padding(16.dp)
+                    .padding(vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(text = "카메라 이미지 전송 시간 조절", color = textColor)
-                    Text(
-                        text = "${captureInterval.toInt()} min",
-                        color = PrimaryColor,
-                        fontWeight = FontWeight.Bold
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconBox(icon = Icons.Outlined.Notifications, isDark = isDark)
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Text(text = "온열등", fontSize = 16.sp, color = textColor)
                 }
-                Spacer(modifier = Modifier.height(8.dp))
-                Slider(
-                    value = captureInterval,
-                    onValueChange = { captureInterval = it },
-                    valueRange = 1f..60f,
-                    colors = SliderDefaults.colors(
-                        thumbColor = PrimaryColor,
-                        activeTrackColor = PrimaryColor,
-                        inactiveTrackColor = if (isDark) Color.DarkGray else Color.LightGray
+
+                Switch(
+                    checked = on,
+                    onCheckedChange = { isChecked ->
+                        on = isChecked
+                        configRef.update("ON", isChecked)
+                            .addOnSuccessListener {
+                               Log.d("DB", "온열등 설정 변경 성공: $isChecked")
+                            }
+                            .addOnFailureListener { e ->
+                                Log.w("DB", "온열등 설정 변경 실패", e)
+                            }
+                    },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = PrimaryColor
                     )
                 )
             }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconBox(icon = Icons.Outlined.Notifications, isDark = isDark)
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Text(text = "LED", fontSize = 16.sp, color = textColor)
+                }
+                Switch(
+                    checked = LED, // 현재 LED 상태 변수
+                    onCheckedChange = { isChecked ->
+                        // 1. 앱 화면의 스위치 모양을 즉시 바꿈
+                        LED = isChecked
+
+                        // 2. 파이어베이스 DB에 값 전송 ("LED" 필드를 수정)
+                        configRef.update("LED", isChecked)
+                            .addOnSuccessListener {
+                                Log.d("DB", "LED 설정 변경 성공: $isChecked")
+                            }
+                            .addOnFailureListener { e ->
+                                Log.w("DB", "LED 설정 변경 실패", e)
+                            }
+                    },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = PrimaryColor
+                    )
+                )
+            }
+
+            // === Section 2: Camera ===
+
+
 
             Spacer(modifier = Modifier.height(16.dp))
 

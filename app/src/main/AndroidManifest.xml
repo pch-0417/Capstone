@@ -10,7 +10,8 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Capstone_App">
+        android:theme="@style/Theme.Capstone_App"
+        android:usesCleartextTraffic="true">
         <activity
             android:name="com.example.capstone_app.MainActivity"
             android:exported="true"

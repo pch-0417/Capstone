@@ -3,6 +3,10 @@ package com.example.capstone_app // ⭐ 본인 패키지명으로 꼭 수정하�
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import android.view.ViewGroup
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -351,32 +355,69 @@ fun MenuDrawerContent() {
     }
 }
 @Composable
-fun CameraHeaderSection(onMenuClick : () -> Unit) {
+fun CameraHeaderSection(
+    ipAddress: String = "192.168.0.15", // ESP32 IP 주소 (필요시 변경)
+    onMenuClick: () -> Unit
+) {
     val context = LocalContext.current
+    val streamUrl = "http://$ipAddress:81/stream" // 스트리밍 URL 생성
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(300.dp)
-            .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp, topStart = 24.dp, topEnd = 24.dp))
-            .background(Color.DarkGray) // 실제 이미지가 있다면 Image 컴포넌트로 대체
+            .clip(RoundedCornerShape(24.dp)) // 4면 모두 24dp 적용
+            .background(Color.DarkGray)
     ) {
-        // 배경 이미지 홀더 (Gradient로 대체)
+        // ----------------------------------------------------------------
+        // 1. [교체됨] 배경: ESP32 카메라 화면 (WebView)
+        // ----------------------------------------------------------------
+        AndroidView(
+            modifier = Modifier.fillMaxSize(),
+            factory = { ctx ->
+                WebView(ctx).apply {
+                    layoutParams = ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+                    settings.apply {
+                        javaScriptEnabled = true
+                        loadWithOverviewMode = true
+                        useWideViewPort = true
+                    }
+                    webViewClient = WebViewClient()
+                    loadUrl(streamUrl)
+                }
+            }
+        )
+
+        // ----------------------------------------------------------------
+        // 2. [추가됨] 가독성 오버레이 (카메라 화면 위에 살짝 어두운 막 씌우기)
+        // ----------------------------------------------------------------
+        // 이게 없으면 카메라가 흰 벽을 비출 때 메뉴 버튼이나 글씨가 안 보입니다.
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        colors = listOf(Color(0xFF2C3E50), Color(0xFF4CA1AF))
+                        colors = listOf(
+                            Color.Black.copy(alpha = 0.6f), // 위쪽은 진하게 (헤더 잘 보이게)
+                            Color.Transparent               // 아래쪽은 투명하게 (영상 잘 보이게)
+                        ),
+                        startY = 0f,
+                        endY = 400f // 위쪽 일부만 그라데이션 적용
                     )
                 )
         )
 
-        // 상단 헤더 (메뉴, 타이틀, 설정)
+        // ----------------------------------------------------------------
+        // 3. 상단 헤더 (메뉴, 타이틀, 설정) - 기존 디자인 유지
+        // ----------------------------------------------------------------
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 16.dp, start = 16.dp, end = 16.dp)
-                .statusBarsPadding(), // 상태바 겹침 방지
+                .statusBarsPadding(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -409,12 +450,14 @@ fun CameraHeaderSection(onMenuClick : () -> Unit) {
             }
         }
 
-        Spacer(modifier = Modifier.height(6.dp))
-        // LIVE 배지 (좌상단)
+        // ----------------------------------------------------------------
+        // 4. LIVE 배지 (좌상단) - 기존 디자인 유지
+        // ----------------------------------------------------------------
+        // 헤더랑 겹치지 않게 padding top 조절
         Row(
             modifier = Modifier
-                .padding(top = 80.dp, start = 16.dp)
-                .background(Color(0xFFDC2626).copy(alpha = 0.8f), RoundedCornerShape(50))
+                .padding(top = 100.dp, start = 16.dp) // 위치 살짝 조정 (헤더 아래로)
+                .background(Color(0xFFDC2626).copy(alpha = 0.9f), RoundedCornerShape(50))
                 .padding(horizontal = 12.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
