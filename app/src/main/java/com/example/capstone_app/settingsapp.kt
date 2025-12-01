@@ -102,7 +102,6 @@ fun SettingsScreen(onBackClick: () -> Unit = {}) {
         ) {
             // === Section 1: Data & Refresh ===
             SectionHeader(text = "배터리 절전 모드", textColor = textColor)
-
             Text(
                 text = "사진 촬영 시간 조정" ,
                 fontSize = 14.sp,
@@ -197,24 +196,8 @@ fun SettingsScreen(onBackClick: () -> Unit = {}) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Camera Quality (링크형 메뉴)
-            NavigationItem(
-                icon = Icons.Default.HighQuality,
-                title = "카메라 화질 설정",
-                valueText = "High",
-                isDark = isDark,
-                textColor = textColor
-            )
-
             // === Section 3: General ===
             SectionHeader(text = "General", textColor = textColor)
-
-            NavigationItem(
-                icon = Icons.Outlined.Person,
-                title = "계정",
-                isDark = isDark,
-                textColor = textColor
-            )
             NavigationItem(
                 icon = Icons.Outlined.Help,
                 title = "도움말",

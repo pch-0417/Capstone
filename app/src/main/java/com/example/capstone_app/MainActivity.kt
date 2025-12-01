@@ -14,12 +14,16 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,7 +39,15 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.example.settingsapp.SettingsActivity
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Color
+import hilt_aggregated_deps._dagger_hilt_android_internal_managers_ServiceComponentManager_ServiceComponentBuilderEntryPoint
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import kotlinx.coroutines.delay
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import java.util.TimeZone
 
 
 // --- 컬러 팔레트 정의 (CSS 기반) ---
@@ -75,6 +87,27 @@ data class SensorData(
 fun LiveMonitorApp() {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+    var currentTime by remember { mutableStateOf("Loading...") }
+
+    LaunchedEffect(Unit){
+        while (true){
+            val formatter = SimpleDateFormat("HH:mm:ss", Locale.KOREA)
+            formatter.timeZone = TimeZone.getTimeZone("Asia/Seoul")
+            currentTime = formatter.format(Date())
+            delay(1000L)
+        }
+    }
+
+    val sensors = listOf(
+        SensorData("Temperature", "22.5", "°C", "Normal", TempColor, Icons.Default.Thermostat),
+        SensorData("Illuminance", "850", " lux", "Warning", IllumColor, Icons.Default.WbSunny, isAlert = true),
+        SensorData("Water Level", "78", " cm", "Normal", WaterColor, Icons.Default.WaterDrop),
+        SensorData("pH", "6.8", " pH", "Alert", PhColor, Icons.Default.Science, isAlert = true),
+        // 스크롤 확인을 위해 더미 데이터 추가
+        SensorData("Humidity", "45", " %", "Normal", BrandPrimary, Icons.Default.WaterDrop),
+        SensorData("CO2", "400", " ppm", "Good", TextSecondary, Icons.Default.Cloud)
+    )
+
     MaterialTheme {
         ModalNavigationDrawer(
             drawerState = drawerState,
@@ -86,36 +119,45 @@ fun LiveMonitorApp() {
                 bottomBar = { MonitorBottomBar() },
                 containerColor = BgColor
             ) { paddingValues ->
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues)
-                ) {// 1. 상단 카메라 영역 (헤더 포함)
-                    CameraHeaderSection(
-                        onMenuClick = {
-                        scope.launch { drawerState.open() }
-                    }
-                )
+                 LazyVerticalGrid(
+                     columns = GridCells.Fixed(2),
+                     modifier = Modifier
+                         .fillMaxSize()
+                         .padding(paddingValues),
+                     contentPadding = PaddingValues(24.dp),
+                     horizontalArrangement = Arrangement.spacedBy(16.dp),
+                     verticalArrangement = Arrangement.spacedBy(16.dp)
+                 ) {
+                     item(span = { GridItemSpan(2) }) {
+                             CameraHeaderSection(
+                                 onMenuClick = {
+                                     scope.launch { drawerState.open() }
+                                 }
+                             )
+                        }
+                         item(span = { GridItemSpan(2) }) {
+                            Text(
+                                text = currentTime,
+                                fontSize = 40.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding( bottom = 8.dp),
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
 
-                // 2. 시간 표시
-                    Text(
-                        text = "10:30:55",
-                        fontSize = 40.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 24.dp, bottom = 12.dp),
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                    )
-
-                // 3. 센서 그리드
-                    SensorGridSection()
+                            )
+                         }
+                         items(sensors) {sensor ->
+                             Box(modifier = Modifier.padding(horizontal = 8.dp)){
+                                 SensorCard(sensor)
+                             }
+                         }
+                     }
                 }
             }
         }
     }
-}
 @Composable
 fun MenuDrawerContent() {
     ModalDrawerSheet(
@@ -173,17 +215,6 @@ fun MenuDrawerContent() {
             )
 
             // Logout (Default Style)
-            NavigationDrawerItem(
-                label = { Text("Logout", fontWeight = FontWeight.Bold) },
-                icon = { Icon(Icons.Default.Logout, contentDescription = null) },
-                selected = false,
-                onClick = { /* 로그아웃 로직 */ },
-                colors = NavigationDrawerItemDefaults.colors(
-                    unselectedIconColor = TextPrimary,
-                    unselectedTextColor = TextPrimary
-                ),
-                modifier = Modifier.padding(vertical = 4.dp)
-            )
 
             Spacer(modifier = Modifier.weight(1f)) // 남은 공간 차지
 
@@ -200,12 +231,11 @@ fun MenuDrawerContent() {
 @Composable
 fun CameraHeaderSection(onMenuClick : () -> Unit) {
     val context = LocalContext.current
-
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(400.dp)
-            .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
+            .height(300.dp)
+            .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp, topStart = 24.dp, topEnd = 24.dp))
             .background(Color.DarkGray) // 실제 이미지가 있다면 Image 컴포넌트로 대체
     ) {
         // 배경 이미지 홀더 (Gradient로 대체)
@@ -223,7 +253,7 @@ fun CameraHeaderSection(onMenuClick : () -> Unit) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(bottom = 16.dp, start = 16.dp, end = 16.dp)
                 .statusBarsPadding(), // 상태바 겹침 방지
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
@@ -257,6 +287,7 @@ fun CameraHeaderSection(onMenuClick : () -> Unit) {
             }
         }
 
+        Spacer(modifier = Modifier.height(6.dp))
         // LIVE 배지 (좌상단)
         Row(
             modifier = Modifier
@@ -272,18 +303,6 @@ fun CameraHeaderSection(onMenuClick : () -> Unit) {
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text("LIVE", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-        }
-
-        // 전체화면 버튼 (우상단)
-        IconButton(
-            onClick = {},
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 80.dp, end = 16.dp)
-                .size(32.dp)
-                .background(Color.Black.copy(alpha = 0.4f), CircleShape)
-        ) {
-            Icon(Icons.Default.Fullscreen, contentDescription = "Fullscreen", tint = Color.White, modifier = Modifier.size(18.dp))
         }
     }
 }
@@ -379,7 +398,7 @@ fun WaveChart(color: Color) {
     Canvas(
         modifier = Modifier
             .fillMaxWidth()
-            .height(60.dp)
+            .height(50.dp)
     ) {
         val width = size.width
         val height = size.height
