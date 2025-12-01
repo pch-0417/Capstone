@@ -7,9 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:929843438254:android:b4da7720f2a63a2936c33f",
+        "mobilesdk_app_id": "1:929843438254:android:cd60e562c1171b6e36c33f",
         "android_client_info": {
-          "package_name": "com.example.livemonitor"
+          "package_name": "com.example.capstone_app"
         }
       },
       "oauth_client": [],

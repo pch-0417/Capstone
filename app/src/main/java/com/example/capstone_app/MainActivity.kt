@@ -5,52 +5,51 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.settingsapp.SettingsActivity
+import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
-import androidx.compose.foundation.Canvas
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.graphics.*
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.Path
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.runtime.*
-import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 val ColorPrimary = Color(0xFF13b6ec)      // Cyan (Primary)
 val ColorBackground = Color(0xFFf6f8f8)   // Light Background
@@ -80,6 +79,16 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+data class AlertItem(
+    val title: String,
+    val description: String,
+    val source: String,
+    val time: String,
+    val icon: ImageVector,
+    val iconBgColor: Color,
+    val iconColor: Color,
+    val isUnread: Boolean = false
+)
 data class SensorData(
     val title: String,
     val value: String,
@@ -87,7 +96,8 @@ data class SensorData(
     val statusText: String,
     val color: Color,
     val icon: ImageVector,
-    val isAlert: Boolean = false
+    val isAlert: Boolean = false,
+    val graphData: List<Float> = emptyList()
 )
 // --- 1. 메인 화면 (화면 관리자) ---
 @Composable
@@ -170,14 +180,56 @@ fun DashboardScreen() {
             delay(1000L)
         }
     }
-    val sensors = listOf(
-        SensorData("Temperature", "22.5", "°C", "Normal", TempColor, Icons.Default.Thermostat),
-        SensorData("Illuminance", "850", " lux", "Warning", IllumColor, Icons.Default.WbSunny, isAlert = true),
-        SensorData("Water Level", "78", " cm", "Normal", WaterColor, Icons.Default.WaterDrop),
-        SensorData("pH", "6.8", " pH", "Alert", PhColor, Icons.Default.Science, isAlert = true),
-        // 스크롤 확인을 위해 더미 데이터 추가
+    val sensors = remember {
+        mutableStateListOf(
+            SensorData("Temperature", "-", "°C", "Loading", TempColor, Icons.Default.Thermostat),
+            SensorData("Water Level", "-", " cm", "Loading", WaterColor, Icons.Default.WaterDrop),
+            SensorData("pH", "-", " pH", "Loading", PhColor, Icons.Default.Science, isAlert = true),
+            SensorData("Humidity", "-", " %", "Loading", BrandPrimary, Icons.Default.WaterDrop)
+        )
+    }
+    fun updateSensor(index: Int, newVal: Float, status: String = "Live") {
+        if (sensors.size > index) {
+            val oldList = sensors[index].graphData
+            val newList = if (oldList.isEmpty()) {
+                List(20) { newVal }
+            } else {
+                (oldList + newVal).takeLast(20)
+            }
 
-    )
+            sensors[index] = sensors[index].copy(
+                value = if (newVal == 0f) "-" else newVal.toString(), // 0f면 "-" 표시
+                statusText = status,
+                graphData = newList
+            )
+        }
+    }
+
+    val db = Firebase.firestore
+    val docRef = db.collection("sensor").document("temp")
+
+    docRef.addSnapshotListener { snapshot, e ->
+        if (e != null) {
+            println("Firestore Error: ${e.message}")
+            return@addSnapshotListener
+        }
+
+        if (snapshot != null && snapshot.exists()) {
+            // 1. 값 가져오기 (Float으로 변환하며, 실패 시 0f로 처리하여 튕김 방지)
+            val tempVal = snapshot.get("Temperature")?.toString()?.toFloatOrNull() ?: 0f
+            val waterVal = snapshot.get("WaterLevel")?.toString()?.toFloatOrNull() ?: 0f
+            val phVal = snapshot.get("pH")?.toString()?.toFloatOrNull() ?: 0f
+            val humVal = snapshot.get("Humidity")?.toString()?.toFloatOrNull() ?: 0f
+
+            // 2. [핵심] updateSensor 함수 호출 (그래프 데이터 누적)
+            // 현재 sensors 리스트 순서: 0:온도, 1:수위, 2:pH, 3:습도
+            updateSensor(0, tempVal)   // Temperature (Index 0)
+            updateSensor(1, waterVal)  // Water Level (Index 1)
+            updateSensor(2, phVal)     // pH (Index 2)
+            updateSensor(3, humVal)    // Humidity (Index 3)
+        }
+    }
+
     MaterialTheme {
         ModalNavigationDrawer(
             drawerState = drawerState,
@@ -435,42 +487,60 @@ fun SensorCard(data: SensorData) {
             Spacer(modifier = Modifier.height(16.dp))
 
             // 미니 차트 (Canvas로 웨이브 그리기)
-            WaveChart(color = data.color)
+            WaveChart(
+                data = data.graphData,
+                color = data.color)
         }
     }
 }
 @Composable
-fun WaveChart(color: Color) {
+fun WaveChart(
+    data: List<Float>, // ⭐ 데이터를 받도록 수정
+    color: Color
+) {
     Canvas(
         modifier = Modifier
             .fillMaxWidth()
             .height(50.dp)
     ) {
+        val points = if (data.isEmpty()) listOf(0f, 0f) else if (data.size == 1) listOf(data[0], data[0]) else data
+
         val width = size.width
         val height = size.height
 
-        // 간단한 베지어 곡선 시뮬레이션
-        val path = Path().apply {
-            moveTo(0f, height * 0.7f)
-            cubicTo(
-                width * 0.25f, height * 0.9f,
-                width * 0.5f, height * 0.2f,
-                width * 0.75f, height * 0.6f
-            )
-            cubicTo(
-                width * 0.8f, height * 0.7f,
-                width * 0.9f, height * 0.3f,
-                width, height * 0.5f
-            )
-            // 아래 영역 채우기를 위해 닫기
+        // 데이터 정규화 (그래프 높이에 맞추기)
+        var maxVal = data.maxOrNull() ?: 0f
+        var minVal = data.minOrNull() ?: 0f
+
+        if (maxVal == minVal) {
+            maxVal += 1f
+            minVal -= 1f
+        }
+        val range = maxVal - minVal
+
+        // 좌표 계산 함수
+        fun getX(index: Int) = (index.toFloat() / (data.size - 1)) * width
+        fun getY(value: Float) = height - ((value - minVal) / range) * height
+
+        // 1. 선 그리기 경로 (Stroke)
+        val strokePath = Path().apply {
+            moveTo(getX(0), getY(points[0])) // 시작점
+            for (i in 1 until points.size) {
+                // 부드러운 곡선 대신 반응 빠른 직선(lineTo) 사용
+                lineTo(getX(i), getY(points[i]))
+            }
+        }
+        // 2. 아래 채우기 경로
+        val fillPath = Path().apply {
+            addPath(strokePath)
             lineTo(width, height)
             lineTo(0f, height)
             close()
         }
 
-        // 그라데이션 채우기
+
         drawPath(
-            path = path,
+            path = fillPath,
             brush = Brush.verticalGradient(
                 colors = listOf(color.copy(alpha = 0.3f), color.copy(alpha = 0.0f)),
                 startY = 0f,
@@ -478,28 +548,15 @@ fun WaveChart(color: Color) {
             )
         )
 
-        // 상단 선 그리기 (채우기 path와 별도로 라인만 다시 그림)
-        val strokePath = Path().apply {
-            moveTo(0f, height * 0.7f)
-            cubicTo(
-                width * 0.25f, height * 0.9f,
-                width * 0.5f, height * 0.2f,
-                width * 0.75f, height * 0.6f
-            )
-            cubicTo(
-                width * 0.8f, height * 0.7f,
-                width * 0.9f, height * 0.3f,
-                width, height * 0.5f
-            )
-        }
-
+        // 6. 선 그리기
         drawPath(
             path = strokePath,
             color = color,
-            style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
+            style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
         )
     }
 }
+
 @Composable
 fun HistoryScreen() {
     Column(
@@ -846,17 +903,229 @@ fun FooterText() {
         color = ColorTextSub
     )
 }
+@Composable
+fun AlertsTopBar() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.White.copy(alpha = 0.8f)) // backdrop blur 흉내
+            .padding(16.dp)
+    ) {
+        // 뒤로가기 아이콘 (왼쪽)
+        Icon(
+            imageVector = Icons.Default.ArrowBackIosNew,
+            contentDescription = "Back",
+            tint = Color(0xFF1F2937), // Gray-800
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .size(24.dp)
+        )
 
+        // 제목 (중앙)
+        Text(
+            text = "알림",
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFF111827), // Gray-900
+            modifier = Modifier.align(Alignment.Center)
+        )
+
+        // 모두 읽음 버튼 (오른쪽)
+        Text(
+            text = "모두 읽음",
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            color = BrandPrimary,
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .clickable { /* 모두 읽음 처리 */ }
+        )
+    }
+    HorizontalDivider(color = ColorBorder)
+}
+@Composable
+fun TabItem(
+    text: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = text,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            color = if (isSelected) BrandPrimary else Color(0xFF9CA3AF) // Gray-400
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        // 하단 바 (선택되면 파란색, 아니면 투명)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(3.dp)
+                .background(if (isSelected) BrandPrimary else Color.Transparent)
+        )
+    }
+}
+@Composable
+fun AlertListItem(item: AlertItem) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.White)
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // 아이콘 (원형 배경)
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .background(item.iconBgColor, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = item.icon,
+                contentDescription = null,
+                tint = item.iconColor,
+                modifier = Modifier.size(28.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        // 텍스트 내용
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = item.title,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color(0xFF111827) // Gray-900
+            )
+            Text(
+                text = item.description,
+                fontSize = 14.sp,
+                color = Color(0xFF4B5563), // Gray-600
+                maxLines = 2
+            )
+            Text(
+                text = item.source,
+                fontSize = 14.sp,
+                color = Color(0xFF6B7280) // Gray-500
+            )
+        }
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        // 시간 및 읽음 표시
+        Column(
+            horizontalAlignment = Alignment.End,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = item.time,
+                fontSize = 14.sp,
+                color = Color(0xFF6B7280) // Gray-500
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            // 읽지 않음 표시 (파란 점)
+            if (item.isUnread) {
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .background(BrandPrimary, CircleShape)
+                )
+            }
+        }
+    }
+}
 @Composable
 fun AlertsScreen() {
-    Box(
-        modifier = Modifier.fillMaxSize().background(Color.White),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(Icons.Default.Notifications, contentDescription = null, modifier = Modifier.size(64.dp), tint = Color.Gray)
-            Spacer(modifier = Modifier.height(16.dp))
-            Text("알림(Alerts) 화면입니다", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+    var selectedTab by remember { mutableStateOf("오늘") }
+
+    // 알림 데이터 (HTML 내용 반영)
+    val alerts = listOf(
+        AlertItem(
+            title = "온도 임계값 초과",
+            description = "온도가 30°C를 초과했습니다.",
+            source = "거실 센서",
+            time = "5분 전",
+            icon = Icons.Default.DeviceThermostat,
+            iconBgColor = Color(0xFFFFE0B2), // Orange-100
+            iconColor = Color(0xFFF57C00),   // Orange-500
+            isUnread = true
+        ),
+        AlertItem(
+            title = "배터리 부족 경고",
+            description = "배터리 잔량이 10% 미만입니다.",
+            source = "현관 카메라",
+            time = "15분 전",
+            icon = Icons.Default.BatteryAlert,
+            iconBgColor = Color(0xFFFFCDD2), // Red-100
+            iconColor = Color(0xFFD32F2F),   // Red-500
+            isUnread = true
+        ),
+        AlertItem(
+            title = "새로운 데이터 리포트",
+            description = "주간 데이터 리포트가 생성되었습니다.",
+            source = "시스템",
+            time = "오후 2:30",
+            icon = Icons.Default.Analytics,
+            iconBgColor = Color(0xFFBBDEFB), // Blue-100
+            iconColor = Color(0xFF1976D2),   // Blue-500
+            isUnread = false
+        ),
+        AlertItem(
+            title = "시스템이 업데이트되었습니다",
+            description = "앱 안정성이 향상되었습니다.",
+            source = "시스템",
+            time = "오전 9:00",
+            icon = Icons.Default.SystemUpdate,
+            iconBgColor = Color(0xFFF5F5F5), // Gray-100
+            iconColor = Color(0xFF9E9E9E),   // Gray-500
+            isUnread = false
+        )
+    )
+
+    Scaffold(
+        topBar = {
+            AlertsTopBar()
+        },
+        containerColor = Color.White
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            // 상단 탭 (오늘 / 이번 주)
+            Row(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                TabItem(
+                    text = "오늘",
+                    isSelected = selectedTab == "오늘",
+                    onClick = { selectedTab = "오늘" },
+                    modifier = Modifier.weight(1f)
+                )
+                TabItem(
+                    text = "이번 주",
+                    isSelected = selectedTab == "이번 주",
+                    onClick = { selectedTab = "이번 주" },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            // 알림 리스트
+            LazyColumn {
+                items(alerts) { alert ->
+                    AlertListItem(alert)
+                    HorizontalDivider(color = ColorBorder, thickness = 1.dp)
+                }
+            }
         }
     }
 }
