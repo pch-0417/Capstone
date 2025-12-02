@@ -2,6 +2,7 @@ package com.example.capstone_app // ⭐ 본인 패키지명으로 꼭 수정하�
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import android.view.ViewGroup
 import android.webkit.WebView
@@ -46,7 +47,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.settingsapp.SettingsActivity
-import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.ValueEventListener
+import com.google.firebase.database.ktx.database
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -176,6 +180,8 @@ fun DashboardScreen() {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     var currentTime by remember { mutableStateOf("Loading...") }
+
+    // 시계 동작 (기존 코드 유지)
     LaunchedEffect(Unit) {
         while (true) {
             val formatter = SimpleDateFormat("HH:mm:ss", Locale.KOREA)
@@ -184,6 +190,8 @@ fun DashboardScreen() {
             delay(1000L)
         }
     }
+
+    // 센서 데이터 리스트 초기화
     val sensors = remember {
         mutableStateListOf(
             SensorData("Temperature", "-", "°C", "Loading", TempColor, Icons.Default.Thermostat),
@@ -192,6 +200,8 @@ fun DashboardScreen() {
             SensorData("Humidity", "-", " %", "Loading", BrandPrimary, Icons.Default.WaterDrop)
         )
     }
+
+    // 센서값 업데이트 함수
     fun updateSensor(index: Int, newVal: Float, status: String = "Live") {
         if (sensors.size > index) {
             val oldList = sensors[index].graphData
@@ -202,37 +212,54 @@ fun DashboardScreen() {
             }
 
             sensors[index] = sensors[index].copy(
-                value = if (newVal == 0f) "-" else newVal.toString(), // 0f면 "-" 표시
+                value = if (newVal == 0f) "-" else String.format("%.1f", newVal), // 소수점 1자리 포맷팅 추천
                 statusText = status,
                 graphData = newList
             )
         }
     }
 
-    val db = Firebase.firestore
-    val docRef = db.collection("sensor").document("temp")
+    // =================================================================
+    // [변경됨] Realtime Database 연결 (Firestore 부분 제거됨)
+    // =================================================================
+    val database = Firebase.database
+    val monitorRef = database.getReference("monitor") // 아까 만든 'monitor' 폴더를 바라봄
 
-    docRef.addSnapshotListener { snapshot, e ->
-        if (e != null) {
-            println("Firestore Error: ${e.message}")
-            return@addSnapshotListener
+    DisposableEffect(Unit) {
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                if (snapshot.exists()) {
+                    // 1. 값 가져오기
+                    // DB에 저장된 키 이름(temperature 등)과 정확히 일치해야 합니다.
+                    // toString().toFloatOrNull()을 쓰면 DB에 숫자로 저장되든 문자로 저장되든 안전하게 가져옵니다.
+                    val tempVal = snapshot.child("temperature").value?.toString()?.toFloatOrNull() ?: 0f
+                    val waterVal = snapshot.child("waterLevel").value?.toString()?.toFloatOrNull() ?: 0f
+                    val phVal = snapshot.child("ph").value?.toString()?.toFloatOrNull() ?: 0f
+                    val humVal = snapshot.child("humidity").value?.toString()?.toFloatOrNull() ?: 0f
+
+                    // 2. updateSensor 함수 호출 (순서 주의: 0=온도, 1=수위, 2=pH, 3=습도)
+                    updateSensor(0, tempVal)
+                    updateSensor(1, waterVal)
+                    updateSensor(2, phVal)
+                    updateSensor(3, humVal)
+
+                    Log.d("Dashboard", "센서값 갱신됨: $tempVal, $humVal")
+                }
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                Log.w("Dashboard", "데이터 수신 실패", error.toException())
+            }
         }
 
-        if (snapshot != null && snapshot.exists()) {
-            // 1. 값 가져오기 (Float으로 변환하며, 실패 시 0f로 처리하여 튕김 방지)
-            val tempVal = snapshot.get("Temperature")?.toString()?.toFloatOrNull() ?: 0f
-            val waterVal = snapshot.get("WaterLevel")?.toString()?.toFloatOrNull() ?: 0f
-            val phVal = snapshot.get("pH")?.toString()?.toFloatOrNull() ?: 0f
-            val humVal = snapshot.get("Humidity")?.toString()?.toFloatOrNull() ?: 0f
+        monitorRef.addValueEventListener(listener)
 
-            // 2. [핵심] updateSensor 함수 호출 (그래프 데이터 누적)
-            // 현재 sensors 리스트 순서: 0:온도, 1:수위, 2:pH, 3:습도
-            updateSensor(0, tempVal)   // Temperature (Index 0)
-            updateSensor(1, waterVal)  // Water Level (Index 1)
-            updateSensor(2, phVal)     // pH (Index 2)
-            updateSensor(3, humVal)    // Humidity (Index 3)
+        // 화면 벗어날 때 리스너 해제 (메모리 관리)
+        onDispose {
+            monitorRef.removeEventListener(listener)
         }
     }
+    // =================================================================
 
     MaterialTheme {
         ModalNavigationDrawer(
@@ -242,7 +269,6 @@ fun DashboardScreen() {
             }
         ){
             Scaffold(
-                // bottomBar = { MonitorBottomBar() }, // <--- 바텀바 제거됨
                 containerColor = BgColor
             ) { paddingValues ->
                 LazyVerticalGrid(
@@ -271,10 +297,9 @@ fun DashboardScreen() {
                                 .fillMaxWidth()
                                 .padding( bottom = 8.dp),
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-
-                            )
+                        )
                     }
-                    items(sensors) {sensor ->
+                    items(sensors) { sensor ->
                         Box(modifier = Modifier.padding(horizontal = 8.dp)){
                             SensorCard(sensor)
                         }
@@ -356,7 +381,7 @@ fun MenuDrawerContent() {
 }
 @Composable
 fun CameraHeaderSection(
-    ipAddress: String = "192.168.0.15", // ESP32 IP 주소 (필요시 변경)
+    ipAddress: String = "10.161.23.183"  , // ESP32 IP 주소 (필요시 변경)
     onMenuClick: () -> Unit
 ) {
     val context = LocalContext.current
