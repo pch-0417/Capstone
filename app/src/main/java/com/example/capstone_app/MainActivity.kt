@@ -1,92 +1,107 @@
-package com.example.capstone_app // ⭐ 본인 패키지명으로 꼭 수정하세요!
+package com.example.capstone_app // ⭐ 본인 패키지명 확인!
 
+// [1] 안드로이드 시스템 & 차트용 색상 별칭
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
-import androidx.activity.ComponentActivity
 import android.view.ViewGroup
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import androidx.compose.ui.viewinterop.AndroidView
+import android.widget.CalendarView
+import android.graphics.Color as AndroidColor // ★ 차트용 색상 별칭
+
+// [2] Activity & Core
+import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+
+// [3] Jetpack Compose
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.*
+import androidx.compose.foundation.lazy.grid.*
+import androidx.compose.foundation.shape.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.PaintingStyle.Companion.Stroke
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.settingsapp.SettingsActivity
+import androidx.compose.ui.viewinterop.AndroidView
+
+// [4] Firebase
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.ValueEventListener
 import com.google.firebase.database.ktx.database
 import com.google.firebase.ktx.Firebase
+
+// [5] MPAndroidChart
+import com.github.mikephil.charting.charts.LineChart
+import com.github.mikephil.charting.components.XAxis
+import com.github.mikephil.charting.data.Entry
+import com.github.mikephil.charting.data.LineData
+import com.github.mikephil.charting.data.LineDataSet
+
+// [6] 기타
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import java.util.TimeZone
-import androidx.compose.ui.tooling.preview.Preview
-val ColorPrimary = Color(0xFF13b6ec)      // Cyan (Primary)
-val ColorBackground = Color(0xFFf6f8f8)   // Light Background
-val ColorTextMain = Color(0xFF18181b)     // Zinc 900
-val ColorTextSub = Color(0xFF71717a)      // Zinc 500
-val ColorBorder = Color(0xFFe4e4e7)       // Zinc 200
-val ChartCyan = Color(0xFF25c6da)
-val ChartOrange = Color(0xFFf97316)
-val ChartBlue = Color(0xFF3b82f6)
-val ChartPurple = Color(0xFFa855f7)
+import java.util.*
+
+// [7] 설정 액티비티 (없으면 주석 처리)
+import com.example.settingsapp.SettingsActivity
+
+// ==========================================
+// [A] 색상 정의 (Compose용)
+// ==========================================
+val BrandPrimary = Color(0xFF13B6EC)
 val BgColor = Color(0xFFF7F8FC)
 val CardBgColor = Color(0xFFFFFFFF)
 val TextPrimary = Color(0xFF1C1C1E)
 val TextSecondary = Color(0xFF8A8A8E)
-val BorderColor = Color(0xFFE5E5EA)
-val BrandPrimary = Color(0xFF13B6EC)
-// 센서별 색상
+val ColorBorder = Color(0xFFE5E5EA)
+
+// 센서별 고유 색상
 val TempColor = Color(0xFFFFA500) // Orange
-val IllumColor = Color(0xFFFFD60A) // Yellow
 val WaterColor = Color(0xFF34C759) // Green
 val PhColor = Color(0xFFFF3B30)    // Red
-class MainActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContent {
-            LiveMonitorApp()
-        }
-    }
-}
+
+// ==========================================
+// [B] 데이터 클래스 (이름 충돌 방지 위해 변경됨)
+// ==========================================
+
+// 1. DB 및 그래프용 데이터
+data class HistorySensorData(
+    val timestamp: Long = 0,
+    val temperature: Float = 0f,
+    val humidity: Float = 0f,
+    val waterLevel: Float = 0f,
+    val ph: Float = 0f
+)
+
+// 2. 대시보드 UI 카드용 데이터
+data class DashboardSensorData(
+    val title: String,
+    val value: String,
+    val unit: String,
+    val statusText: String,
+    val color: Color,
+    val icon: ImageVector,
+    val isAlert: Boolean = false,
+    val graphData: List<Float> = emptyList()
+)
+
+// 3. 알림용 데이터
 data class AlertItem(
     val title: String,
     val description: String,
@@ -97,91 +112,72 @@ data class AlertItem(
     val iconColor: Color,
     val isUnread: Boolean = false
 )
-data class SensorData(
-    val title: String,
-    val value: String,
-    val unit: String,
-    val statusText: String,
-    val color: Color,
-    val icon: ImageVector,
-    val isAlert: Boolean = false,
-    val graphData: List<Float> = emptyList()
-)
-// --- 1. 메인 화면 (화면 관리자) ---
+
+// ==========================================
+// [C] 메인 액티비티
+// ==========================================
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContent {
+            LiveMonitorApp()
+        }
+    }
+}
+
+// --- 1. 메인 네비게이션 관리 ---
 @Composable
 fun LiveMonitorApp() {
-    // 현재 선택된 화면을 기억하는 변수 ("Dashboard"가 기본값)
     var currentScreen by remember { mutableStateOf("Dashboard") }
 
     Scaffold(
-        // 하단 네비게이션 바 설정
         bottomBar = {
             NavigationBar(containerColor = Color.White) {
-                // 1️⃣ Dashboard 버튼
+                // Dashboard
                 NavigationBarItem(
                     selected = currentScreen == "Dashboard",
-                    onClick = { currentScreen = "Dashboard" }, // 클릭 시 화면 변경
+                    onClick = { currentScreen = "Dashboard" },
                     icon = { Icon(Icons.Default.Dashboard, contentDescription = null) },
                     label = { Text("Dashboard") },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = Color(0xFF007AFF), // 선택되면 파란색
-                        selectedTextColor = Color(0xFF007AFF),
-                        indicatorColor = Color(0xFF007AFF).copy(alpha = 0.1f), // 배경 연한 파랑
-                        unselectedIconColor = Color.Gray,
-                        unselectedTextColor = Color.Gray
-                    )
+                    colors = NavigationBarItemDefaults.colors(selectedTextColor = BrandPrimary, selectedIconColor = BrandPrimary)
                 )
-                // 2️⃣ History 버튼
+                // History
                 NavigationBarItem(
                     selected = currentScreen == "History",
                     onClick = { currentScreen = "History" },
                     icon = { Icon(Icons.Default.History, contentDescription = null) },
                     label = { Text("History") },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = Color(0xFF007AFF),
-                        selectedTextColor = Color(0xFF007AFF),
-                        indicatorColor = Color(0xFF007AFF).copy(alpha = 0.1f),
-                        unselectedIconColor = Color.Gray,
-                        unselectedTextColor = Color.Gray
-                    )
+                    colors = NavigationBarItemDefaults.colors(selectedTextColor = BrandPrimary, selectedIconColor = BrandPrimary)
                 )
-                // 3️⃣ Alerts 버튼
+                // Alerts
                 NavigationBarItem(
                     selected = currentScreen == "Alerts",
                     onClick = { currentScreen = "Alerts" },
                     icon = { Icon(Icons.Default.Notifications, contentDescription = null) },
                     label = { Text("Alerts") },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = Color(0xFF007AFF),
-                        selectedTextColor = Color(0xFF007AFF),
-                        indicatorColor = Color(0xFF007AFF).copy(alpha = 0.1f),
-                        unselectedIconColor = Color.Gray,
-                        unselectedTextColor = Color.Gray
-                    )
+                    colors = NavigationBarItemDefaults.colors(selectedTextColor = BrandPrimary, selectedIconColor = BrandPrimary)
                 )
             }
         }
     ) { paddingValues ->
-        // 내용이 들어갈 공간 (Box)
         Box(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
             when (currentScreen) {
-                "Dashboard" -> DashboardScreen() // 대시보드 보여주기
-                "History" -> HistoryScreen()     // 히스토리 보여주기
-                "Alerts" -> AlertsScreen()       // 알림 보여주기
+                "Dashboard" -> DashboardScreen()
+                "History" -> HistoryScreen() // 그래프 화면 연결
+                "Alerts" -> AlertsScreen()
             }
         }
     }
 }
 
-// --- 2. 각 화면별 디자인 (Composable 함수) ---
-
+// --- 2. 대시보드 화면 ---
 @Composable
 fun DashboardScreen() {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     var currentTime by remember { mutableStateOf("Loading...") }
 
-    // 시계 동작 (기존 코드 유지)
+    // 시계 동작
     LaunchedEffect(Unit) {
         while (true) {
             val formatter = SimpleDateFormat("HH:mm:ss", Locale.KOREA)
@@ -191,17 +187,17 @@ fun DashboardScreen() {
         }
     }
 
-    // 센서 데이터 리스트 초기화
+    // 센서 데이터 리스트 (DashboardSensorData 사용)
     val sensors = remember {
         mutableStateListOf(
-            SensorData("Temperature", "-", "°C", "Loading", TempColor, Icons.Default.Thermostat),
-            SensorData("Water Level", "-", " cm", "Loading", WaterColor, Icons.Default.WaterDrop),
-            SensorData("pH", "-", " pH", "Loading", PhColor, Icons.Default.Science, isAlert = true),
-            SensorData("Humidity", "-", " %", "Loading", BrandPrimary, Icons.Default.WaterDrop)
+            DashboardSensorData("Temperature", "-", "°C", "Loading", TempColor, Icons.Default.Thermostat),
+            DashboardSensorData("Water Level", "-", " cm", "Loading", WaterColor, Icons.Default.WaterDrop),
+            DashboardSensorData("pH", "-", " pH", "Loading", PhColor, Icons.Default.Science, isAlert = true),
+            DashboardSensorData("Humidity", "-", " %", "Loading", BrandPrimary, Icons.Default.WaterDrop)
         )
     }
 
-    // 센서값 업데이트 함수
+    // 센서값 UI 업데이트 로직
     fun updateSensor(index: Int, newVal: Float, status: String = "Live") {
         if (sensors.size > index) {
             val oldList = sensors[index].graphData
@@ -212,80 +208,54 @@ fun DashboardScreen() {
             }
 
             sensors[index] = sensors[index].copy(
-                value = if (newVal == 0f) "-" else String.format("%.1f", newVal), // 소수점 1자리 포맷팅 추천
+                value = if (newVal == 0f) "-" else String.format("%.1f", newVal),
                 statusText = status,
                 graphData = newList
             )
         }
     }
 
-    // =================================================================
-    // [변경됨] Realtime Database 연결 (Firestore 부분 제거됨)
-    // =================================================================
+    // Firebase Monitor 연결
     val database = Firebase.database
-    val monitorRef = database.getReference("monitor") // 아까 만든 'monitor' 폴더를 바라봄
+    val monitorRef = database.getReference("monitor")
 
     DisposableEffect(Unit) {
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 if (snapshot.exists()) {
-                    // 1. 값 가져오기
-                    // DB에 저장된 키 이름(temperature 등)과 정확히 일치해야 합니다.
-                    // toString().toFloatOrNull()을 쓰면 DB에 숫자로 저장되든 문자로 저장되든 안전하게 가져옵니다.
                     val tempVal = snapshot.child("temperature").value?.toString()?.toFloatOrNull() ?: 0f
                     val waterVal = snapshot.child("waterLevel").value?.toString()?.toFloatOrNull() ?: 0f
                     val phVal = snapshot.child("ph").value?.toString()?.toFloatOrNull() ?: 0f
                     val humVal = snapshot.child("humidity").value?.toString()?.toFloatOrNull() ?: 0f
 
-                    // 2. updateSensor 함수 호출 (순서 주의: 0=온도, 1=수위, 2=pH, 3=습도)
+                    // 순서대로 업데이트 (0:온도, 1:수위, 2:pH, 3:습도)
                     updateSensor(0, tempVal)
                     updateSensor(1, waterVal)
                     updateSensor(2, phVal)
                     updateSensor(3, humVal)
-
-                    Log.d("Dashboard", "센서값 갱신됨: $tempVal, $humVal")
                 }
             }
-
-            override fun onCancelled(error: DatabaseError) {
-                Log.w("Dashboard", "데이터 수신 실패", error.toException())
-            }
+            override fun onCancelled(error: DatabaseError) {}
         }
-
         monitorRef.addValueEventListener(listener)
-
-        // 화면 벗어날 때 리스너 해제 (메모리 관리)
-        onDispose {
-            monitorRef.removeEventListener(listener)
-        }
+        onDispose { monitorRef.removeEventListener(listener) }
     }
-    // =================================================================
 
     MaterialTheme {
         ModalNavigationDrawer(
             drawerState = drawerState,
-            drawerContent = {
-                MenuDrawerContent()
-            }
+            drawerContent = { MenuDrawerContent() }
         ){
-            Scaffold(
-                containerColor = BgColor
-            ) { paddingValues ->
+            Scaffold(containerColor = BgColor) { paddingValues ->
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(2),
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues),
+                    modifier = Modifier.fillMaxSize().padding(paddingValues),
                     contentPadding = PaddingValues(24.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     item(span = { GridItemSpan(2) }) {
-                        CameraHeaderSection(
-                            onMenuClick = {
-                                scope.launch { drawerState.open() }
-                            }
-                        )
+                        CameraHeaderSection(onMenuClick = { scope.launch { drawerState.open() } })
                     }
                     item(span = { GridItemSpan(2) }) {
                         Text(
@@ -293,901 +263,239 @@ fun DashboardScreen() {
                             fontSize = 40.sp,
                             fontWeight = FontWeight.Bold,
                             color = TextPrimary,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding( bottom = 8.dp),
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                         )
                     }
                     items(sensors) { sensor ->
-                        Box(modifier = Modifier.padding(horizontal = 8.dp)){
-                            SensorCard(sensor)
-                        }
+                        SensorCard(sensor)
                     }
                 }
             }
         }
     }
 }
-@Composable
-fun MenuDrawerContent() {
-    ModalDrawerSheet(
-        drawerContainerColor = CardBgColor,
-        modifier = Modifier.width(300.dp) // 너비 제한
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp)
-        ) {
-            // 1. 프로필 영역
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(vertical = 24.dp)
-            ) {
-                // 프로필 이미지 대용 아이콘
-                Surface(
-                    shape = CircleShape,
-                    color = Color.LightGray,
-                    modifier = Modifier.size(48.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.padding(8.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.width(16.dp))
-                Text(
-                    text = "Jane Doe",
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary
-                )
-            }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // 2. 메뉴 아이템 리스트
-
-            // Edit Profile (Selected Style)
-            NavigationDrawerItem(
-                label = { Text("Edit Profile", fontWeight = FontWeight.Bold) },
-                icon = { Icon(Icons.Default.Edit, contentDescription = null) },
-                selected = true,
-                onClick = { /* 프로필 수정 이동 */ },
-                colors = NavigationDrawerItemDefaults.colors(
-                    selectedContainerColor = BrandPrimary.copy(alpha = 0.1f),
-                    selectedIconColor = BrandPrimary,
-                    selectedTextColor = BrandPrimary
-                ),
-                modifier = Modifier.padding(vertical = 4.dp)
-            )
-
-            // Logout (Default Style)
-
-            Spacer(modifier = Modifier.weight(1f)) // 남은 공간 차지
-
-            // 3. 하단 버전 정보
-            Text(
-                text = "App Version: 1.2.3",
-                color = TextSecondary,
-                fontSize = 14.sp,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-        }
-    }
-}
-@Composable
-fun CameraHeaderSection(
-    ipAddress: String = "10.161.23.183"  , // ESP32 IP 주소 (필요시 변경)
-    onMenuClick: () -> Unit
-) {
-    val context = LocalContext.current
-    val streamUrl = "http://$ipAddress:81/stream" // 스트리밍 URL 생성
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(300.dp)
-            .clip(RoundedCornerShape(24.dp)) // 4면 모두 24dp 적용
-            .background(Color.DarkGray)
-    ) {
-        // ----------------------------------------------------------------
-        // 1. [교체됨] 배경: ESP32 카메라 화면 (WebView)
-        // ----------------------------------------------------------------
-        AndroidView(
-            modifier = Modifier.fillMaxSize(),
-            factory = { ctx ->
-                WebView(ctx).apply {
-                    layoutParams = ViewGroup.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT
-                    )
-                    settings.apply {
-                        javaScriptEnabled = true
-                        loadWithOverviewMode = true
-                        useWideViewPort = true
-                    }
-                    webViewClient = WebViewClient()
-                    loadUrl(streamUrl)
-                }
-            }
-        )
-
-        // ----------------------------------------------------------------
-        // 2. [추가됨] 가독성 오버레이 (카메라 화면 위에 살짝 어두운 막 씌우기)
-        // ----------------------------------------------------------------
-        // 이게 없으면 카메라가 흰 벽을 비출 때 메뉴 버튼이나 글씨가 안 보입니다.
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Black.copy(alpha = 0.6f), // 위쪽은 진하게 (헤더 잘 보이게)
-                            Color.Transparent               // 아래쪽은 투명하게 (영상 잘 보이게)
-                        ),
-                        startY = 0f,
-                        endY = 400f // 위쪽 일부만 그라데이션 적용
-                    )
-                )
-        )
-
-        // ----------------------------------------------------------------
-        // 3. 상단 헤더 (메뉴, 타이틀, 설정) - 기존 디자인 유지
-        // ----------------------------------------------------------------
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp, start = 16.dp, end = 16.dp)
-                .statusBarsPadding(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            IconButton(
-                onClick = onMenuClick,
-                modifier = Modifier
-                    .size(40.dp)
-                    .background(Color.Black.copy(alpha = 0.4f), CircleShape)
-            ) {
-                Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.White)
-            }
-
-            Text(
-                text = "Live Monitor",
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp
-            )
-
-            IconButton(
-                onClick = {
-                    val intent = Intent(context, SettingsActivity::class.java)
-                    context.startActivity(intent)
-                },
-                modifier = Modifier
-                    .size(40.dp)
-                    .background(Color.Black.copy(alpha = 0.4f), CircleShape)
-            ) {
-                Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White)
-            }
-        }
-
-        // ----------------------------------------------------------------
-        // 4. LIVE 배지 (좌상단) - 기존 디자인 유지
-        // ----------------------------------------------------------------
-        // 헤더랑 겹치지 않게 padding top 조절
-        Row(
-            modifier = Modifier
-                .padding(top = 100.dp, start = 16.dp) // 위치 살짝 조정 (헤더 아래로)
-                .background(Color(0xFFDC2626).copy(alpha = 0.9f), RoundedCornerShape(50))
-                .padding(horizontal = 12.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .background(Color.White, CircleShape)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("LIVE", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-        }
-    }
-}
-@Composable
-fun SensorCard(data: SensorData) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = CardBgColor),
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, BorderColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .padding(12.dp)
-                .fillMaxWidth()
-        ) {
-            // 아이콘 + 타이틀
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = data.icon,
-                    contentDescription = null,
-                    tint = data.color,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = data.title,
-                    color = TextPrimary,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // 값
-            Text(
-                text = "${data.value}${data.unit}",
-                color = TextPrimary,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold
-            )
-
-            // 상태 표시 (점 + 텍스트)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(6.dp)
-                        .background(data.color, CircleShape)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = data.statusText,
-                    color = data.color,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // 미니 차트 (Canvas로 웨이브 그리기)
-            WaveChart(
-                data = data.graphData,
-                color = data.color)
-        }
-    }
-}
-@Composable
-fun WaveChart(
-    data: List<Float>, // ⭐ 데이터를 받도록 수정
-    color: Color
-) {
-    Canvas(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(50.dp)
-    ) {
-        val points = if (data.isEmpty()) listOf(0f, 0f) else if (data.size == 1) listOf(data[0], data[0]) else data
-
-        val width = size.width
-        val height = size.height
-
-        // 데이터 정규화 (그래프 높이에 맞추기)
-        var maxVal = data.maxOrNull() ?: 0f
-        var minVal = data.minOrNull() ?: 0f
-
-        if (maxVal == minVal) {
-            maxVal += 1f
-            minVal -= 1f
-        }
-        val range = maxVal - minVal
-
-        // 좌표 계산 함수
-        fun getX(index: Int) = (index.toFloat() / (data.size - 1)) * width
-        fun getY(value: Float) = height - ((value - minVal) / range) * height
-
-        // 1. 선 그리기 경로 (Stroke)
-        val strokePath = Path().apply {
-            moveTo(getX(0), getY(points[0])) // 시작점
-            for (i in 1 until points.size) {
-                // 부드러운 곡선 대신 반응 빠른 직선(lineTo) 사용
-                lineTo(getX(i), getY(points[i]))
-            }
-        }
-        // 2. 아래 채우기 경로
-        val fillPath = Path().apply {
-            addPath(strokePath)
-            lineTo(width, height)
-            lineTo(0f, height)
-            close()
-        }
-
-
-        drawPath(
-            path = fillPath,
-            brush = Brush.verticalGradient(
-                colors = listOf(color.copy(alpha = 0.3f), color.copy(alpha = 0.0f)),
-                startY = 0f,
-                endY = height
-            )
-        )
-
-        // 6. 선 그리기
-        drawPath(
-            path = strokePath,
-            color = color,
-            style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
-        )
-    }
-}
-
+// --- 3. 히스토리 화면 (그래프 + 달력) ---
+// --- 3. 히스토리 화면 (그래프 크게 + 글자 크게 수정됨) ---
 @Composable
 fun HistoryScreen() {
+    // 1. 상태 관리
+    var historyDataList by remember { mutableStateOf(listOf<HistorySensorData>()) }
+    var selectedDateText by remember { mutableStateOf("날짜를 선택하세요") }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(ColorBackground)
-            .verticalScroll(rememberScrollState())
-            .padding(bottom = 24.dp) // 하단 여백
+            .background(BgColor)
+            .padding(16.dp) // 전체 여백
+            .verticalScroll(rememberScrollState()) // ★ 화면이 길어질 수 있으니 스크롤 추가
     ) {
-        Header()            // 상단 제목 & 공유 버튼
-        TimeFrameSelector() // Day/Week/Month/Year 선택기
-        StatisticsCard()    // 통계 차트 카드
-        CalendarCard()      // 달력 카드
-        FooterText()        // 하단 안내 문구
-        }
-}
-
-@Composable
-fun Header() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        // 왼쪽 빈 공간 (균형 맞추기용)
-        Box(modifier = Modifier.size(48.dp))
-
         Text(
-            text = "Statistics",
-            fontSize = 18.sp,
+            text = " History Graph",
+            fontSize = 24.sp, // 제목도 조금 더 크게
             fontWeight = FontWeight.Bold,
-            color = ColorTextMain
+            color = TextPrimary,
+            modifier = Modifier.padding(bottom = 16.dp)
         )
 
-        // 공유 버튼 (기본 아이콘 사용)
-        IconButton(
-            onClick = { },
-            modifier = Modifier.size(48.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Share,
-                contentDescription = "Share",
-                tint = ColorTextMain
-            )
-        }
-    }
-}
-@Composable
-fun TimeFrameSelector() {
-    val options = listOf("Day", "Week", "Month", "Year")
-    var selectedOption by remember { mutableStateOf("Week") }
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp)
-            .height(40.dp)
-            .background(Color(0xFFf4f4f5), RoundedCornerShape(8.dp)) // Zinc 100
-            .padding(4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        options.forEach { option ->
-            val isSelected = selectedOption == option
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(if (isSelected) Color.White else Color.Transparent)
-                    .clickable { selectedOption = option },
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = option,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = if (isSelected) ColorPrimary else ColorTextSub
-                )
-            }
-        }
-    }
-}
-@Composable
-fun StatisticsCard() {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        border = BorderStroke(1.dp, ColorBorder)
-    ) {
-        Column(modifier = Modifier.padding(24.dp)) {
-            Text(
-                text = "Overall Statistics",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Medium,
-                color = ColorTextMain
-            )
-            Row(
-                verticalAlignment = Alignment.Bottom,
-                modifier = Modifier.padding(bottom = 16.dp)
-            ) {
-                Text(
-                    text = "Weekly Summary",
-                    fontSize = 32.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = ColorTextMain,
-                    modifier = Modifier.padding(end = 8.dp)
-                )
-                Text(
-                    text = "+3.8%",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = Color(0xFF22c55e) // Green 500
-                )
-            }
-
-            // 차트 영역 (Canvas로 직접 그리기)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(180.dp)
-            ) {
-                CustomLineChart()
-            }
-
-            // 요일 라벨
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun").forEach { day ->
-                    Text(
-                        text = day,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = ColorTextSub
-                    )
-                }
-            }
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), color = ColorBorder)
-
-            // 범례 (Legend)
-            Column {
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    LegendItem(color = ChartCyan, text = "CO2 Levels", modifier = Modifier.weight(1f))
-                    LegendItem(color = ChartOrange, text = "Temperature", modifier = Modifier.weight(1f))
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    LegendItem(color = ChartBlue, text = "Humidity", modifier = Modifier.weight(1f))
-                    LegendItem(color = ChartPurple, text = "PM2.5", modifier = Modifier.weight(1f))
-                }
-            }
-        }
-    }
-}
-@Composable
-fun LegendItem(color: Color, text: String, modifier: Modifier = Modifier) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier
-    ) {
-        Box(
-            modifier = Modifier
-                .size(8.dp)
-                .clip(CircleShape)
-                .background(color)
-        )
-        Spacer(modifier = Modifier.width(8.dp))
         Text(
-            text = text,
-            fontSize = 14.sp,
-            color = Color(0xFF3f3f46) // Zinc 700
-        )
-    }
-}
-
-@Composable
-fun CustomLineChart() {
-    Canvas(modifier = Modifier.fillMaxSize()) {
-        val width = size.width
-        val height = size.height
-
-        // 차트 1 (점선, Cyan)
-        val path1 = Path().apply {
-            moveTo(0f, height * 0.7f)
-            cubicTo(width * 0.1f, height * 0.1f, width * 0.4f, height * 0.1f, width * 0.5f, height * 0.2f)
-            cubicTo(width * 0.6f, height * 0.4f, width * 0.8f, height * 0.9f, width, height * 0.9f)
-        }
-        drawPath(
-            path = path1,
-            color = ChartCyan,
-            style = Stroke(width = 5f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f), cap = StrokeCap.Round)
+            text = "선택된 날짜: $selectedDateText",
+            fontSize = 16.sp,
+            modifier = Modifier.padding(bottom = 12.dp)
         )
 
-        // 차트 2 (실선, Orange)
-        val path2 = Path().apply {
-            moveTo(0f, height * 0.5f)
-            cubicTo(width * 0.2f, height * 0.4f, width * 0.5f, height * 0.6f, width * 0.7f, height * 0.7f)
-            cubicTo(width * 0.8f, height * 0.8f, width * 0.9f, height * 0.9f, width, height * 0.8f)
-        }
-        drawPath(path = path2, color = ChartOrange, style = Stroke(width = 5f, cap = StrokeCap.Round))
-
-        // 차트 3 (실선, Blue)
-        val path3 = Path().apply {
-            moveTo(0f, height * 0.3f)
-            cubicTo(width * 0.2f, height * 0.8f, width * 0.4f, height * 0.9f, width * 0.6f, height * 0.6f)
-            cubicTo(width * 0.8f, height * 0.3f, width * 0.9f, height * 0.2f, width, height * 0.3f)
-        }
-        drawPath(path = path3, color = ChartBlue, style = Stroke(width = 5f, cap = StrokeCap.Round))
-
-        // 차트 4 (실선, Purple)
-        val path4 = Path().apply {
-            moveTo(0f, height * 0.9f)
-            cubicTo(width * 0.2f, height * 0.4f, width * 0.5f, height * 0.5f, width * 0.7f, height * 0.2f)
-            cubicTo(width * 0.8f, height * 0.1f, width * 0.9f, height * 0.3f, width, height * 0.1f)
-        }
-        drawPath(path = path4, color = ChartPurple, style = Stroke(width = 5f, cap = StrokeCap.Round))
-    }
-}
-@Composable
-fun CalendarCard() {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        border = BorderStroke(1.dp, ColorBorder)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            // 달력 헤더
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                // 기본 아이콘 사용 (ChevronLeft)
-                IconButton(onClick = { }) {
-                    Icon(Icons.Default.ChevronLeft, contentDescription = "Prev", tint = ColorTextMain)
-                }
-                Text(
-                    text = "October 2023",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = ColorTextMain
-                )
-                // 기본 아이콘 사용 (ChevronRight)
-                IconButton(onClick = { }) {
-                    Icon(Icons.Default.ChevronRight, contentDescription = "Next", tint = ColorTextMain)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // 요일 (S M T W T F S)
-            Row(modifier = Modifier.fillMaxWidth()) {
-                listOf("S", "M", "T", "W", "T", "F", "S").forEach { day ->
-                    Text(
-                        text = day,
-                        modifier = Modifier.weight(1f),
-                        textAlign = TextAlign.Center,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = ColorTextSub
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // 날짜 그리드
-            val days = (1..31).toList()
-            val gridItems = days.chunked(7)
-
-            gridItems.forEach { week ->
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    week.forEach { day ->
-                        // HTML 스타일 로직 (특정 날짜 색상 변경)
-                        val bgColor = when (day) {
-                            5 -> ColorPrimary // 선택된 날짜 (파란색)
-                            7 -> Color(0xFF06b6d4) // Cyan 500
-                            else -> when (day) {
-                                1, 9 -> Color(0xFFecfeff)
-                                2, 8, 13 -> Color(0xFFcffafe)
-                                3, 11 -> Color(0xFFa5f3fc)
-                                4, 15 -> Color(0xFF67e8f9)
-                                6 -> Color(0xFF22d3ee)
-                                10 -> Color(0xFFffedd5) // Orange
-                                14 -> Color(0xFFe9d5ff) // Purple
-                                else -> Color.Transparent
-                            }
-                        }
-
-                        val textColor = if (day == 5 || day == 7) Color.White else if(day >= 16) Color(0xFFa1a1aa) else ColorTextMain
-
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(40.dp)
-                                .padding(2.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .clip(CircleShape)
-                                    .background(bgColor),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = day.toString(),
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = textColor
-                                )
-                            }
-                        }
-                    }
-                    // 남은 칸 채우기
-                    repeat(7 - week.size) {
-                        Spacer(modifier = Modifier.weight(1f))
-                    }
-                }
-            }
-        }
-    }
-}
-@Composable
-fun FooterText() {
-    Text(
-        text = "Tap a day to see details",
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 12.dp),
-        textAlign = TextAlign.Center,
-        fontSize = 14.sp,
-        color = ColorTextSub
-    )
-}
-@Composable
-fun AlertsTopBar() {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color.White.copy(alpha = 0.8f)) // backdrop blur 흉내
-            .padding(16.dp)
-    ) {
-        // 뒤로가기 아이콘 (왼쪽)
-        Icon(
-            imageVector = Icons.Default.ArrowBackIosNew,
-            contentDescription = "Back",
-            tint = Color(0xFF1F2937), // Gray-800
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .size(24.dp)
-        )
-
-        // 제목 (중앙)
-        Text(
-            text = "알림",
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color(0xFF111827), // Gray-900
-            modifier = Modifier.align(Alignment.Center)
-        )
-
-        // 모두 읽음 버튼 (오른쪽)
-        Text(
-            text = "모두 읽음",
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
-            color = BrandPrimary,
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .clickable { /* 모두 읽음 처리 */ }
-        )
-    }
-    HorizontalDivider(color = ColorBorder)
-}
-@Composable
-fun TabItem(
-    text: String,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier
-            .clickable(onClick = onClick)
-            .padding(vertical = 12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = text,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
-            color = if (isSelected) BrandPrimary else Color(0xFF9CA3AF) // Gray-400
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        // 하단 바 (선택되면 파란색, 아니면 투명)
-        Box(
+        // [영역 1] 그래프 (MPAndroidChart) - 크기 및 스타일 수정
+        AndroidView(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(3.dp)
-                .background(if (isSelected) BrandPrimary else Color.Transparent)
-        )
-    }
-}
-@Composable
-fun AlertListItem(item: AlertItem) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color.White)
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // 아이콘 (원형 배경)
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .background(item.iconBgColor, CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = item.icon,
-                contentDescription = null,
-                tint = item.iconColor,
-                modifier = Modifier.size(28.dp)
-            )
-        }
+                .height(500.dp) // ★ 1. 높이를 350dp -> 500dp로 변경 (더 길게)
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color.White)
+                .padding(8.dp), // 그래프 내부 여백 살짝 줌
+            factory = { context ->
+                LineChart(context).apply {
+                    description.isEnabled = false
+                    setTouchEnabled(true)
+                    isDragEnabled = true
+                    setScaleEnabled(true)
+                    setPinchZoom(true)
 
-        Spacer(modifier = Modifier.width(16.dp))
+                    // 배경에 격자 그리기 (보기 편하게)
+                    setDrawGridBackground(false)
 
-        // 텍스트 내용
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = item.title,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Medium,
-                color = Color(0xFF111827) // Gray-900
-            )
-            Text(
-                text = item.description,
-                fontSize = 14.sp,
-                color = Color(0xFF4B5563), // Gray-600
-                maxLines = 2
-            )
-            Text(
-                text = item.source,
-                fontSize = 14.sp,
-                color = Color(0xFF6B7280) // Gray-500
-            )
-        }
+                    // ★ 2. 범례 (Legend: 온도, 습도 텍스트) 설정 - 아주 크게!
+                    legend.apply {
+                        isEnabled = true
+                        textSize = 16f        // 글자 크기 (기본 10f -> 16f)
+                        formSize = 16f        // 색상 네모 크기
+                        form = com.github.mikephil.charting.components.Legend.LegendForm.CIRCLE // 동그라미 모양
+                        textColor = AndroidColor.BLACK
+                        xEntrySpace = 20f     // 항목 간 가로 간격 넓힘
+                        yEntrySpace = 10f     // 줄 간격
+                        isWordWrapEnabled = true // 화면 좁으면 줄바꿈
+                        verticalAlignment = com.github.mikephil.charting.components.Legend.LegendVerticalAlignment.BOTTOM
+                        horizontalAlignment = com.github.mikephil.charting.components.Legend.LegendHorizontalAlignment.CENTER
+                        orientation = com.github.mikephil.charting.components.Legend.LegendOrientation.HORIZONTAL
+                        setDrawInside(false)
+                    }
 
-        Spacer(modifier = Modifier.width(8.dp))
+                    // ★ 3. X축 (시간) 설정 - 크게
+                    xAxis.apply {
+                        position = XAxis.XAxisPosition.BOTTOM
+                        setDrawGridLines(false)
+                        textSize = 14f        // 글자 크기 확대
+                        textColor = AndroidColor.DKGRAY
+                        yOffset = 10f         // 그래프와 글자 사이 간격 벌림
+                    }
 
-        // 시간 및 읽음 표시
-        Column(
-            horizontalAlignment = Alignment.End,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Text(
-                text = item.time,
-                fontSize = 14.sp,
-                color = Color(0xFF6B7280) // Gray-500
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            // 읽지 않음 표시 (파란 점)
-            if (item.isUnread) {
-                Box(
-                    modifier = Modifier
-                        .size(10.dp)
-                        .background(BrandPrimary, CircleShape)
-                )
+                    // ★ 4. Y축 (숫자) 설정 - 크게
+                    axisLeft.apply {
+                        axisMinimum = 0f
+                        axisMaximum = 100f
+                        textSize = 14f        // 글자 크기 확대
+                        textColor = AndroidColor.DKGRAY
+                        xOffset = 10f         // 그래프와 글자 사이 간격 벌림
+                    }
+                    axisRight.isEnabled = false
+
+                    // 여백 자동 계산 (글자가 잘리지 않게)
+                    setExtraOffsets(10f, 10f, 10f, 20f)
+                }
+            },
+            update = { chart ->
+                if (historyDataList.isEmpty()) {
+                    chart.clear()
+                    return@AndroidView
+                }
+
+                // 데이터셋 생성
+                val entriesTemp = historyDataList.mapIndexed { i, d -> Entry(i.toFloat(), d.temperature) }
+                val entriesHumi = historyDataList.mapIndexed { i, d -> Entry(i.toFloat(), d.humidity) }
+                val entriesWater = historyDataList.mapIndexed { i, d -> Entry(i.toFloat(), d.waterLevel) }
+                val entriesPh = historyDataList.mapIndexed { i, d -> Entry(i.toFloat(), d.ph) }
+
+                // ★ 5. 선 스타일 설정 - 선을 더 두껍게 (lineWidth 3f)
+                val setTemp = LineDataSet(entriesTemp, "온도(℃)").apply {
+                    color = AndroidColor.RED
+                    setCircleColor(AndroidColor.RED)
+                    lineWidth = 3f  // 선 두께 3배
+                    circleRadius = 4f // 점 크기 확대
+                    setDrawCircleHole(false)
+                    setDrawValues(false) // 그래프 위의 작은 숫자는 지저분하니까 끔
+                }
+                val setHumi = LineDataSet(entriesHumi, "습도(%)").apply {
+                    color = AndroidColor.BLUE
+                    setCircleColor(AndroidColor.BLUE)
+                    lineWidth = 3f
+                    circleRadius = 4f
+                    setDrawCircleHole(false)
+                    setDrawValues(false)
+                }
+                val setWater = LineDataSet(entriesWater, "수위(cm)").apply {
+                    color = AndroidColor.CYAN
+                    setCircleColor(AndroidColor.CYAN)
+                    lineWidth = 3f
+                    circleRadius = 4f
+                    setDrawCircleHole(false)
+                    setDrawValues(false)
+                }
+                val setPh = LineDataSet(entriesPh, "pH").apply {
+                    color = AndroidColor.GREEN
+                    setCircleColor(AndroidColor.GREEN)
+                    lineWidth = 3f
+                    circleRadius = 4f
+                    setDrawCircleHole(false)
+                    setDrawValues(false)
+                }
+
+                val lineData = LineData(setTemp, setHumi, setWater, setPh)
+                chart.data = lineData
+
+                // 데이터 갱신 시 애니메이션 효과 (X축 방향으로 스르륵)
+                chart.animateX(1000)
+                chart.invalidate()
             }
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // [영역 2] 달력
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            AndroidView(
+                modifier = Modifier
+                    .wrapContentSize()
+                    .align(Alignment.CenterHorizontally)
+                    .padding(16.dp),
+                factory = { context ->
+                    CalendarView(context).apply {
+                        setOnDateChangeListener { _, year, month, dayOfMonth ->
+                            val realMonth = month + 1
+                            selectedDateText = "${year}년 ${realMonth}월 ${dayOfMonth}일"
+
+                            // Firebase 데이터 가져오기
+                            fetchHistoryData(year, month, dayOfMonth) { data ->
+                                historyDataList = data
+                            }
+                        }
+                    }
+                }
+            )
         }
+
+        // 바닥 여백 추가 (스크롤 편하게)
+        Spacer(modifier = Modifier.height(50.dp))
     }
 }
+// 히스토리 데이터 로직
+fun fetchHistoryData(year: Int, month: Int, day: Int, onResult: (List<HistorySensorData>) -> Unit) {
+    val database = Firebase.database
+    val myRef = database.getReference("history")
+
+    val calendar = Calendar.getInstance()
+    calendar.set(year, month, day, 0, 0, 0)
+    val startTs = calendar.timeInMillis
+    calendar.set(year, month, day, 23, 59, 59)
+    val endTs = calendar.timeInMillis
+
+    myRef.orderByChild("timestamp")
+        .startAt(startTs.toDouble())
+        .endAt(endTs.toDouble())
+        .addListenerForSingleValueEvent(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val list = mutableListOf<HistorySensorData>()
+                for (child in snapshot.children) {
+                    val data = child.getValue(HistorySensorData::class.java)
+                    if (data != null) list.add(data)
+                }
+                onResult(list)
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        })
+}
+
+// --- 4. 알림 화면 ---
 @Composable
 fun AlertsScreen() {
     var selectedTab by remember { mutableStateOf("오늘") }
-
-    // 알림 데이터 (HTML 내용 반영)
     val alerts = listOf(
-        AlertItem(
-            title = "온도 임계값 초과",
-            description = "온도가 30°C를 초과했습니다.",
-            source = "거실 센서",
-            time = "5분 전",
-            icon = Icons.Default.DeviceThermostat,
-            iconBgColor = Color(0xFFFFE0B2), // Orange-100
-            iconColor = Color(0xFFF57C00),   // Orange-500
-            isUnread = true
-        ),
-        AlertItem(
-            title = "배터리 부족 경고",
-            description = "배터리 잔량이 10% 미만입니다.",
-            source = "현관 카메라",
-            time = "15분 전",
-            icon = Icons.Default.BatteryAlert,
-            iconBgColor = Color(0xFFFFCDD2), // Red-100
-            iconColor = Color(0xFFD32F2F),   // Red-500
-            isUnread = true
-        ),
-        AlertItem(
-            title = "새로운 데이터 리포트",
-            description = "주간 데이터 리포트가 생성되었습니다.",
-            source = "시스템",
-            time = "오후 2:30",
-            icon = Icons.Default.Analytics,
-            iconBgColor = Color(0xFFBBDEFB), // Blue-100
-            iconColor = Color(0xFF1976D2),   // Blue-500
-            isUnread = false
-        ),
-        AlertItem(
-            title = "시스템이 업데이트되었습니다",
-            description = "앱 안정성이 향상되었습니다.",
-            source = "시스템",
-            time = "오전 9:00",
-            icon = Icons.Default.SystemUpdate,
-            iconBgColor = Color(0xFFF5F5F5), // Gray-100
-            iconColor = Color(0xFF9E9E9E),   // Gray-500
-            isUnread = false
-        )
+        AlertItem("온도 임계값 초과", "온도가 30°C를 초과했습니다.", "거실 센서", "5분 전", Icons.Default.DeviceThermostat, Color(0xFFFFE0B2), Color(0xFFF57C00), true),
+        AlertItem("배터리 부족 경고", "잔량 10% 미만", "현관 카메라", "15분 전", Icons.Default.BatteryAlert, Color(0xFFFFCDD2), Color(0xFFD32F2F), true)
     )
 
     Scaffold(
-        topBar = {
-            AlertsTopBar()
-        },
+        topBar = { AlertsTopBar() },
         containerColor = Color.White
     ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            // 상단 탭 (오늘 / 이번 주)
-            Row(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                TabItem(
-                    text = "오늘",
-                    isSelected = selectedTab == "오늘",
-                    onClick = { selectedTab = "오늘" },
-                    modifier = Modifier.weight(1f)
-                )
-                TabItem(
-                    text = "이번 주",
-                    isSelected = selectedTab == "이번 주",
-                    onClick = { selectedTab = "이번 주" },
-                    modifier = Modifier.weight(1f)
-                )
+        Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+            Row(modifier = Modifier.fillMaxWidth()) {
+                TabItem("오늘", selectedTab == "오늘", { selectedTab = "오늘" }, Modifier.weight(1f))
+                TabItem("이번 주", selectedTab == "이번 주", { selectedTab = "이번 주" }, Modifier.weight(1f))
             }
-            // 알림 리스트
             LazyColumn {
                 items(alerts) { alert ->
                     AlertListItem(alert)
@@ -1198,8 +506,143 @@ fun AlertsScreen() {
     }
 }
 
+@Composable
+fun AlertsTopBar() {
+    Box(modifier = Modifier.fillMaxWidth().background(Color.White.copy(alpha = 0.8f)).padding(16.dp)) {
+        Icon(Icons.Default.ArrowBackIosNew, "Back", modifier = Modifier.align(Alignment.CenterStart).size(24.dp))
+        Text("알림", fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.Center))
+        Text("모두 읽음", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = BrandPrimary, modifier = Modifier.align(Alignment.CenterEnd).clickable { })
+    }
+    HorizontalDivider(color = ColorBorder)
+}
+
+@Composable
+fun TabItem(text: String, isSelected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Column(modifier = modifier.clickable(onClick = onClick).padding(vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(text, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = if (isSelected) BrandPrimary else Color.Gray)
+        Spacer(modifier = Modifier.height(12.dp))
+        Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(if (isSelected) BrandPrimary else Color.Transparent))
+    }
+}
+
+@Composable
+fun AlertListItem(item: AlertItem) {
+    Row(modifier = Modifier.fillMaxWidth().background(Color.White).padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(modifier = Modifier.size(48.dp).background(item.iconBgColor, CircleShape), contentAlignment = Alignment.Center) {
+            Icon(item.icon, null, tint = item.iconColor, modifier = Modifier.size(28.dp))
+        }
+        Spacer(modifier = Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(item.title, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+            Text(item.description, fontSize = 14.sp, color = Color.Gray)
+        }
+        Column(horizontalAlignment = Alignment.End) {
+            Text(item.time, fontSize = 14.sp, color = Color.Gray)
+            if (item.isUnread) Box(modifier = Modifier.size(10.dp).background(BrandPrimary, CircleShape))
+        }
+    }
+}
+
+// --- 5. 공통 컴포넌트 ---
+@Composable
+fun MenuDrawerContent() {
+    ModalDrawerSheet(drawerContainerColor = CardBgColor, modifier = Modifier.width(300.dp)) {
+        Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 24.dp)) {
+                Surface(shape = CircleShape, color = Color.LightGray, modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.padding(8.dp))
+                }
+                Spacer(modifier = Modifier.width(16.dp))
+                Text("Jane Doe", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            }
+            NavigationDrawerItem(label = { Text("Edit Profile") }, icon = { Icon(Icons.Default.Edit, null) }, selected = true, onClick = {}, colors = NavigationDrawerItemDefaults.colors(selectedContainerColor = BrandPrimary.copy(alpha = 0.1f), selectedTextColor = BrandPrimary, selectedIconColor = BrandPrimary))
+            Spacer(modifier = Modifier.weight(1f))
+            Text("App Version: 1.0.0", color = TextSecondary, fontSize = 14.sp)
+        }
+    }
+}
+
+@Composable
+fun CameraHeaderSection(ipAddress: String = "10.161.23.183", onMenuClick: () -> Unit) {
+    val context = LocalContext.current
+    val streamUrl = "http://$ipAddress:81/stream"
+
+    Box(modifier = Modifier.fillMaxWidth().height(300.dp).clip(RoundedCornerShape(24.dp)).background(Color.DarkGray)) {
+        AndroidView(modifier = Modifier.fillMaxSize(), factory = { ctx ->
+            WebView(ctx).apply {
+                layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+                settings.apply { javaScriptEnabled = true; loadWithOverviewMode = true; useWideViewPort = true }
+                webViewClient = WebViewClient()
+                loadUrl(streamUrl)
+            }
+        })
+        Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(colors = listOf(Color.Black.copy(alpha = 0.6f), Color.Transparent), startY = 0f, endY = 400f)))
+        Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            IconButton(onClick = onMenuClick, modifier = Modifier.background(Color.Black.copy(alpha = 0.4f), CircleShape)) { Icon(Icons.Default.Menu, "Menu", tint = Color.White) }
+            Text("Live Monitor", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            IconButton(onClick = { context.startActivity(Intent(context, SettingsActivity::class.java)) }, modifier = Modifier.background(Color.Black.copy(alpha = 0.4f), CircleShape)) { Icon(Icons.Default.Settings, "Settings", tint = Color.White) }
+        }
+    }
+}
+
+@Composable
+fun SensorCard(data: DashboardSensorData) {
+    Card(colors = CardDefaults.cardColors(containerColor = CardBgColor), shape = RoundedCornerShape(16.dp), border = BorderStroke(1.dp, ColorBorder), elevation = CardDefaults.cardElevation(2.dp)) {
+        Column(modifier = Modifier.padding(12.dp).fillMaxWidth()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(data.icon, null, tint = data.color, modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(data.title, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("${data.value}${data.unit}", color = TextPrimary, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(modifier = Modifier.size(6.dp).background(data.color, CircleShape))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(data.statusText, color = data.color, fontSize = 12.sp)
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            WaveChart(data.graphData, data.color)
+        }
+    }
+}
+
+@Composable
+fun WaveChart(data: List<Float>, color: Color) {
+    Canvas(modifier = Modifier.fillMaxWidth().height(50.dp)) {
+        val points = if (data.isEmpty()) listOf(0f, 0f) else if (data.size == 1) listOf(data[0], data[0]) else data
+        val width = size.width
+        val height = size.height
+        var maxVal = points.maxOrNull() ?: 0f
+        var minVal = points.minOrNull() ?: 0f
+        if (maxVal == minVal) { maxVal += 1f; minVal -= 1f }
+        val range = maxVal - minVal
+
+        fun getX(index: Int) = (index.toFloat() / (points.size - 1)) * width
+        fun getY(value: Float) = height - ((value - minVal) / range) * height
+
+        val strokePath = Path().apply {
+            moveTo(getX(0), getY(points[0]))
+            for (i in 1 until points.size) lineTo(getX(i), getY(points[i]))
+        }
+        val fillPath = Path().apply {
+            addPath(strokePath)
+            lineTo(width, height)
+            lineTo(0f, height)
+            close()
+        }
+        drawPath(path = fillPath, brush = Brush.verticalGradient(colors = listOf(color.copy(alpha = 0.3f), color.copy(alpha = 0.0f)), startY = 0f, endY = height))
+        drawPath(path = strokePath, color = color, style = Stroke(
+            width = 3.dp.toPx(),
+            cap = StrokeCap.Round,
+            join = StrokeJoin.Round
+        )
+        )
+    }
+}
+
 @Preview(showBackground = true)
 @Composable
-fun PreviewStatistics() {
-    HistoryScreen()
+fun PreviewMain() {
+    LiveMonitorApp()
 }
