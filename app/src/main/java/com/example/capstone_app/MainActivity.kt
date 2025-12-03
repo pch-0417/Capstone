@@ -292,7 +292,7 @@ fun HistoryScreen() {
             .verticalScroll(rememberScrollState()) // ★ 화면이 길어질 수 있으니 스크롤 추가
     ) {
         Text(
-            text = " History Graph",
+            text = "History Graph",
             fontSize = 24.sp, // 제목도 조금 더 크게
             fontWeight = FontWeight.Bold,
             color = TextPrimary,
