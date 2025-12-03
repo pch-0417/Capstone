@@ -191,7 +191,7 @@ fun DashboardScreen() {
     val sensors = remember {
         mutableStateListOf(
             DashboardSensorData("Temperature", "-", "°C", "Loading", TempColor, Icons.Default.Thermostat),
-            DashboardSensorData("Water Level", "-", " cm", "Loading", WaterColor, Icons.Default.WaterDrop),
+            DashboardSensorData("Water Level", "-", " %", "Loading", WaterColor, Icons.Default.WaterDrop),
             DashboardSensorData("pH", "-", " pH", "Loading", PhColor, Icons.Default.Science, isAlert = true),
             DashboardSensorData("Humidity", "-", " %", "Loading", BrandPrimary, Icons.Default.WaterDrop)
         )
